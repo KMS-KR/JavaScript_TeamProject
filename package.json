@@ -1,0 +1,12 @@
+{
+  "name": "movie-ott-project-v3",
+  "version": "3.0.0",
+  "description": "OTT Recommendation - Problem Solving UI",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

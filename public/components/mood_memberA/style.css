@@ -1,0 +1,4 @@
+.mood-container { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;}
+.mood-btn { background: #222; color: #fff; border: 1px solid #333; padding: 12px 20px; border-radius: 30px; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+.mood-btn:hover { background: var(--primary-color); border-color: var(--primary-color); }
+.mood-result-box { background: #1a1c23; padding: 20px; border-radius: 10px; margin-top: 15px; border-left: 4px solid var(--primary-color); }

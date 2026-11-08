@@ -1,0 +1,17 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+:root { --bg-color: #0f1115; --text-color: #ffffff; --primary-color: #3b82f6; --nav-bg: rgba(15, 17, 21, 0.95); }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-color); overflow-x: hidden; }
+.navbar { position: fixed; top: 0; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 4%; background: var(--nav-bg); z-index: 1000; border-bottom: 1px solid #222;}
+.nav-left { display: flex; align-items: center; gap: 30px; }
+.logo { color: var(--primary-color); font-size: 1.6rem; font-weight: 900; text-decoration: none; }
+.nav-links { display: flex; list-style: none; gap: 20px; margin: 0; padding: 0; }
+.nav-links a { color: #aaa; text-decoration: none; font-weight: 500; }
+.nav-links a:hover { color: #fff; }
+.search-bar { padding: 10px 15px; width: 250px; border: none; background: #222; color: #fff; border-radius: 20px; outline: none;}
+.profile-btn { color: #fff; text-decoration: none; margin-left: 15px; }
+#app-root { min-height: 85vh; padding-top: 70px; }
+footer { padding: 40px; text-align: center; color: #555; font-size: 0.85rem; margin-top: 50px; }
+.main-content { padding: 0 4%; }
+.section-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; margin-top: 50px; display: flex; align-items: center; gap: 10px;}
+.section-subtitle { color: #888; font-size: 0.95rem; font-weight: normal; margin-top: 5px; display: block;}
