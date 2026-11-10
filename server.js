@@ -6,6 +6,9 @@ const PORT = 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// 종원: 검색 페이지용 TMDB API (키는 .env 에서 읽음)
+require('./api_jongwon')(app);
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
