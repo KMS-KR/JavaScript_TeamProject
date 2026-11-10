@@ -1,0 +1,30 @@
+<section class="sj-wrap">
+    <h2 class="section-title">
+        🔎 해시태그 통합 검색
+        <span class="section-subtitle">글자를 칠 필요 없어요. 태그만 누르면 플랫폼별로 최대 10개씩 골라드려요.</span>
+    </h2>
+
+    <!-- 1. 내가 구독 중인 OTT -->
+    <div class="sj-panel">
+        <div class="sj-panel-head">
+            <span class="sj-label">내가 구독 중인 OTT</span>
+            <label class="sj-only">
+                <input type="checkbox" id="sj-only-mine"> 구독 중인 OTT만 보기
+            </label>
+        </div>
+        <div class="sj-chips" id="sj-ott-chips"></div>
+    </div>
+
+    <!-- 2. 해시태그 -->
+    <div class="sj-panel">
+        <div class="sj-panel-head">
+            <span class="sj-label">해시태그</span>
+            <button type="button" class="sj-reset" id="sj-reset">선택 초기화</button>
+        </div>
+        <div id="sj-tag-groups"></div>
+    </div>
+
+    <!-- 3. 결과 -->
+    <p class="sj-summary" id="sj-summary"></p>
+    <div id="sj-results"></div>
+</section>
