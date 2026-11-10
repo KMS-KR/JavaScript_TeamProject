@@ -1,8 +1,30 @@
 // 종원 - 해시태그 기반 통합 검색
-import { PLATFORMS, TAG_GROUPS, CONTENTS } from './data.js';
+import { PLATFORMS, TAG_GROUPS, CONTENTS as SAMPLE } from './data.js';
 
 const MAX_PER_PLATFORM = 10;            // 플랫폼마다 최대 몇 개 보여줄지
 const SAVE_KEY = 'ottpia-my-otts';      // 구독 OTT를 브라우저에 저장할 때 쓰는 이름
+
+// ── 작품 데이터: 서버(/api/jongwon/contents)가 TMDB에서 받아온 걸 쓰고,
+//    실패하면(키 없음 등) data.js 의 샘플을 대신 씀
+let CONTENTS = SAMPLE;
+let source = 'sample';
+
+async function loadContents() {
+    try {
+        const res = await fetch('/api/jongwon/contents');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.items) && data.items.length > 0) {
+            CONTENTS = data.items;
+            source = 'tmdb';
+        }
+    } catch (e) { /* 서버 연결 실패 → 샘플 그대로 */ }
+}
+
+// 글자 안의 < > 같은 기호가 태그로 해석되지 않게 바꿔주기 (외부 데이터라서 필요)
+function esc(text) {
+    return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // ── 현재 선택 상태
 const state = {
@@ -100,20 +122,21 @@ function renderResults() {
     const rowsHtml = platforms.map(p => {
         const list = CONTENTS
             .filter(item => item.platform === p.id && matches(item))
-            .sort((a, b) => score(b) - score(a) || b.year - a.year)
+            .sort((a, b) => score(b) - score(a) || (a.rank ?? 0) - (b.rank ?? 0) || b.year - a.year)
             .slice(0, MAX_PER_PLATFORM);
         total += list.length;
 
         const cards = list.map((item, i) => {
             const tags = [...item.genres, ...item.moods];
             return `
-                <article class="sj-card" style="--sj-color:${p.color}">
+                <article class="sj-card ${item.poster ? 'has-poster' : ''}" style="--sj-color:${p.color}">
+                    ${item.poster ? `<img class="sj-card-poster" src="${esc(item.poster)}" alt="${esc(item.title)} 포스터" loading="lazy">` : ''}
                     <div class="sj-card-rank">${i + 1}</div>
-                    <div class="sj-card-title">${item.title}</div>
-                    <div class="sj-card-meta">${item.year} · ${item.type} · ${item.country[0]}</div>
-                    <div class="sj-card-line">${item.line}</div>
+                    <div class="sj-card-title">${esc(item.title)}</div>
+                    <div class="sj-card-meta">${[item.year, item.type, item.country[0]].filter(Boolean).map(esc).join(' · ')}</div>
+                    <div class="sj-card-line">${esc(item.line) || '줄거리 정보가 아직 없어요.'}</div>
                     <div class="sj-card-tags">
-                        ${tags.map(t => `<span class="${picked.includes(t) ? 'hit' : ''}">#${t}</span>`).join('')}
+                        ${tags.map(t => `<span class="${picked.includes(t) ? 'hit' : ''}">#${esc(t)}</span>`).join('')}
                     </div>
                 </article>`;
         }).join('');
@@ -132,9 +155,13 @@ function renderResults() {
     }).join('');
 
     const tagText = picked.length ? picked.map(t => '#' + t).join(' ') : '전체';
-    const keywordText = state.keyword ? ` · 제목에 "${state.keyword}"` : '';
+    const keywordText = state.keyword ? ` · 제목에 "${esc(state.keyword)}"` : '';
     summary.innerHTML = `<strong>${tagText}</strong>${keywordText} 검색 결과 · ${platforms.length}개 플랫폼에서 <strong>${total}개</strong>`;
     results.innerHTML = rowsHtml;
+
+    document.getElementById('sj-source').textContent = source === 'tmdb'
+        ? '실시간 데이터 · This product uses the TMDB API but is not endorsed or certified by TMDB.'
+        : '지금은 샘플 데이터예요. (서버에 TMDB 키가 없거나 연결에 실패했어요)';
 }
 
 // ── 클릭 연결
@@ -180,4 +207,6 @@ if (navSearch) {
 // ── 처음 한 번 그리기
 renderOttChips();
 renderTagGroups();
-renderResults();
+document.getElementById('sj-summary').textContent = '작품 정보를 불러오는 중이에요...';
+await loadContents();
+if (document.getElementById('sj-results')) renderResults();   // 그사이 다른 페이지로 갔으면 건너뜀
