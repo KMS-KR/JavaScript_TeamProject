@@ -1,7 +1,11 @@
 const express = require('express');
 const path = require('path');
+const { loadLocalEnv, registerTmdbRoutes } = require('./tmdb-api');
+loadLocalEnv(path.join(__dirname, '.env'));
 const app = express();
 const PORT = 3000;
+
+registerTmdbRoutes(app);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
