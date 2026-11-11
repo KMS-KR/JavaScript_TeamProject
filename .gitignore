@@ -1,4 +1,3 @@
-node_modules/
+# API 키 및 환경변수 파일 숨기기
 .env
-.env.*
-!.env.example
+.env.local

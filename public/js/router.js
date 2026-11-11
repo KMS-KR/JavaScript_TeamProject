@@ -15,6 +15,9 @@ async function loadView() {
             loadComponent('zone-memberB', 'platform_top10_memberB');
             loadComponent('zone-memberC', 'hidden_gems_memberC');
         }
+        if (viewName === 'search') {
+            loadComponent('zone-search', 'search_jongwon');
+        }
     } catch (error) {
         appRoot.innerHTML = '<div style="padding: 100px 4%; text-align:center;"><h2>페이지 준비 중입니다.</h2></div>';
     }
