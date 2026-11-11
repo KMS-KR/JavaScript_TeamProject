@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="description" content="OTT피아 TMDB 작품 상세, 외부 리뷰, 10점 한줄평, 콘텐츠 톡" />
+    <title>OTT피아 — 작품 정보 & 커뮤니티</title>
+    <!-- 공통 main.css보다 먼저 선언하는 기본값. 실제 팀 CSS는 최종 HTML에서 그대로 불러옵니다. -->
+    <style>
+      html{background:#0f1115;color-scheme:dark}body{margin:0;font-family:system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}#root{min-height:calc(100vh - 72px)}
+      :where(.navbar){box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;padding:18px max(24px,calc((100% - 1160px)/2));background:#191c22;color:#f1f3f7;border-bottom:1px solid #2b3039;position:sticky;top:0;z-index:40}
+      :where(.navbar *){box-sizing:border-box}
+      :where(.nav-left,.nav-right){display:flex;align-items:center;gap:26px;min-width:0}
+      :where(.logo){font-size:23px;font-weight:800;letter-spacing:-1px;color:#f1f3f7;text-decoration:none;white-space:nowrap}
+      :where(.nav-links){display:flex;align-items:center;gap:24px;padding:0;margin:0;list-style:none;white-space:nowrap}
+      :where(.nav-links a,.profile-btn){font-size:14px;color:#b6bdcb;text-decoration:none;white-space:nowrap}
+      :where(.nav-links a[aria-current='page']){color:#74a9ff;font-weight:700}
+      :where(.nav-right){gap:16px}
+      :where(.search-bar){font:inherit;font-size:12px;width:230px;max-width:100%;padding:10px 12px;border:1px solid #363d49;background:#101217;color:#f1f3f7;border-radius:8px}
+      body.oc-community-page > .navbar{position:sticky;top:0;z-index:40;max-width:none}
+      .oc-site-search{display:flex;align-items:center;gap:8px;margin:0;min-width:0}
+      .oc-nav-search-submit{font:inherit;font-size:12px;cursor:pointer;border:1px solid #363d49;border-radius:7px;background:#222833;color:#dbe7fb;padding:9px 12px;white-space:nowrap}
+      .oc-site-search-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+      :where(.navbar a,.navbar button,.navbar input):focus-visible{outline:2px solid #89b7ff;outline-offset:3px}
+      @media(max-width:980px){:where(.navbar){gap:14px;padding:16px 22px}:where(.nav-right){flex:1;justify-content:flex-end}:where(.search-bar){width:200px}}
+      @media(max-width:760px){:where(.navbar){align-items:flex-start;gap:12px}:where(.nav-left){flex-wrap:wrap;width:100%;justify-content:space-between;gap:12px}:where(.nav-links){gap:18px}:where(.nav-right){width:100%;justify-content:space-between}:where(.search-bar){width:100%}.oc-site-search{flex:1}}
+      @media(max-width:390px){:where(.navbar){padding:14px 16px}:where(.logo){font-size:20px}:where(.nav-links){gap:13px}:where(.nav-links a,.profile-btn){font-size:12px}}
+    </style>
+    
+    
+      <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/community.css" />
+  </head>
+  <body class="oc-community-page">
+    <!-- 팀 index.html의 nav 구조/클래스를 유지합니다. 다른 HTML로 이동하므로 /#home 형식을 사용합니다. -->
+    <nav class="navbar" aria-label="사이트 메뉴">
+      <div class="nav-left">
+        <a href="/#home" class="logo">All-in-OTT</a>
+        <ul class="nav-links">
+          <li><a href="/#home">홈</a></li>
+          <li><a href="/#search">통합 검색</a></li>
+          <li><a href="/community.html?tab=talk" aria-current="page">커뮤니티</a></li>
+        </ul>
+      </div>
+      <div class="nav-right">
+        <form class="oc-site-search" id="oc-site-search" role="search">
+          <label class="oc-site-search-label" for="oc-global-query">TMDB 영화 검색</label>
+          <input id="oc-global-query" type="search" maxlength="100" placeholder="TMDB 영화 제목 검색..." class="search-bar" />
+          <button type="submit" class="oc-nav-search-submit">검색</button>
+        </form>
+        <a href="/#mypage" class="profile-btn">마이페이지</a>
+      </div>
+    </nav>
+    <div id="root"></div>
+    <noscript><p style="color:white;padding:24px">작품 정보와 커뮤니티를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
+    <script>
+      document.getElementById('oc-site-search').addEventListener('submit',function(event){
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('ottpia:movie-search',{detail:document.getElementById('oc-global-query').value.trim()}));
+      });
+    </script>
+      <script type="module" src="/js/community.js"></script>
+  </body>
+</html>
