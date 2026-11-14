@@ -18,6 +18,9 @@ async function loadView() {
         if (viewName === 'search') {
             loadComponent('zone-search', 'search_jongwon');
         }
+        if (viewName === 'ai') {
+            loadComponent('zone-ai', 'ai_seungwoo');
+        }
     } catch (error) {
         appRoot.innerHTML = '<div style="padding: 100px 4%; text-align:center;"><h2>페이지 준비 중입니다.</h2></div>';
     }
