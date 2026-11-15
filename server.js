@@ -1,11 +1,13 @@
 const express = require('express');
 const path = require('path');
 const { loadLocalEnv, registerTmdbRoutes } = require('./tmdb-api');
+const { registerSpoilerRoutes } = require('./spoiler-api');
 loadLocalEnv(path.join(__dirname, '.env'));
 const app = express();
 const PORT = 3000;
 
 registerTmdbRoutes(app);
+registerSpoilerRoutes(app);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());

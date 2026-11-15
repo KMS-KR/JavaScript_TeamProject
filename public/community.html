@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f1115" />
-    <meta name="description" content="OTT피아 TMDB 작품 상세, 외부 리뷰, 10점 한줄평, 콘텐츠 톡" />
-    <title>OTT피아 — 작품 정보 & 커뮤니티</title>
+    <meta name="description" content="OTT피아 작품 정보와 한줄평, 선택해서 확인하는 스포일러" />
+    <title>OTT피아 — 작품 정보 · 스포일러</title>
     <!-- 공통 main.css보다 먼저 선언하는 기본값. 실제 팀 CSS는 최종 HTML에서 그대로 불러옵니다. -->
     <style>
       html{background:#0f1115;color-scheme:dark}body{margin:0;font-family:system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}#root{min-height:calc(100vh - 72px)}
@@ -40,7 +40,8 @@
         <ul class="nav-links">
           <li><a href="/#home">홈</a></li>
           <li><a href="/#search">통합 검색</a></li>
-          <li><a href="/community.html?tab=talk" aria-current="page">커뮤니티</a></li>
+          <li><a href="/community.html" id="oc-nav-detail" aria-current="page">작품 정보</a></li>
+          <li><a href="/spoilers.html" id="oc-nav-spoilers">스포일러</a></li>
         </ul>
       </div>
       <div class="nav-right">
@@ -53,7 +54,7 @@
       </div>
     </nav>
     <div id="root"></div>
-    <noscript><p style="color:white;padding:24px">작품 정보와 커뮤니티를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
+    <noscript><p style="color:white;padding:24px">작품 정보와 스포일러 페이지를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
     <script>
       document.getElementById('oc-site-search').addEventListener('submit',function(event){
         event.preventDefault();
