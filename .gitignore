@@ -1,3 +1,6 @@
 # API 키 및 환경변수 파일 숨기기
 .env
 .env.local
+
+# 라이브러리 폴더 (각자 npm install 로 설치)
+node_modules/
