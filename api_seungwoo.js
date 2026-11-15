@@ -4,6 +4,8 @@
 //     → 요일별 테마에 맞는 영화 한 편 + 상세 추천 이유 (하루에 한 번만 AI 호출, 나머지는 저장된 값)
 //  2) 상황별 큐레이션  POST /api/seungwoo/curate  { weather, day, mood, hour, catalog }
 //     → 날씨·요일·기분을 분석해서 메인 추천 1편 + 대안 2편
+//  3) AI 채팅          POST /api/seungwoo/chat    { messages: [{ role, content }] }
+//     → 자유롭게 대화하면서 영화 추천 (답장 + 추천 0~3편 + 빠른 답장 버튼)
 //
 // API 키는 브라우저 코드에 넣으면 누구나 볼 수 있어서, .env 에만 두고 서버에서 호출합니다.
 //   .env 예시 (server.js 와 같은 폴더)
@@ -121,11 +123,11 @@ const text = (v, max = 300) => String(v ?? '').slice(0, max);
 
 let legacyFormat = false;   // 예전 JSON 지정 방식이 필요한 모델이면 한 번 알아낸 뒤 계속 사용
 
-async function callGemini(body) {
+async function callGeminiOnce(modelName, body) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 40000);
     try {
-        const res = await fetch(`${baseUrl()}/models/${encodeURIComponent(model())}:generateContent`, {
+        const res = await fetch(`${baseUrl()}/models/${encodeURIComponent(modelName)}:generateContent`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey() },
             body: JSON.stringify(body),
@@ -142,11 +144,11 @@ async function callGemini(body) {
     }
 }
 
-// 프롬프트를 보내고, 정해진 JSON 모양(schema)으로 답을 받아 객체로 돌려줌
+// 프롬프트(글자 하나 또는 대화 기록 배열)를 보내고, 정해진 JSON 모양(schema)으로 답을 받아 객체로 돌려줌
 async function askGemini(system, prompt, schema) {
     const base = {
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        contents: Array.isArray(prompt) ? prompt : [{ role: 'user', parts: [{ text: prompt }] }],
     };
     const modern = { responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema } } };
     const legacy = { responseMimeType: 'application/json', responseJsonSchema: schema };
@@ -165,10 +167,35 @@ async function askGemini(system, prompt, schema) {
     return JSON.parse(out.replace(/^```(?:json)?\s*|\s*```$/g, ''));
 }
 
+// Google 서버가 붐비면(503 등) 잠깐 쉬었다 한 번 더, 그래도 안 되면 다른 무료 모델로 바꿔서 시도
+const BACKUP_MODELS = ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'];
+const BUSY = [500, 502, 503, 504];
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function callGemini(body) {
+    const models = [model(), ...BACKUP_MODELS.filter(m => m !== model())];
+    let lastError;
+    for (const m of models) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                return await callGeminiOnce(m, body);
+            } catch (e) {
+                lastError = e;
+                const busy = BUSY.includes(e.status) || e.name === 'AbortError';
+                if (!busy) throw e;                          // 키 오류 같은 건 바로 포기
+                console.log(`[승우 AI] ${m} 서버가 붐벼요 (${e.status || '시간 초과'}). ${attempt === 0 ? '잠시 후 다시 시도' : '다른 모델로 시도'}합니다.`);
+                if (attempt === 0) await wait(1500);
+            }
+        }
+    }
+    throw lastError;
+}
+
 function errorMessage(e) {
     if (/api[_ ]?key/i.test(e.message + (e.detail || '')) || e.status === 401 || e.status === 403) return 'Gemini API 키를 확인해 주세요.';
     if (e.status === 429) return 'Gemini 무료 사용량을 다 썼거나 요청이 너무 빨라요.';
     if (e.status === 404) return `모델 이름(${model()})을 찾을 수 없어요.`;
+    if (BUSY.includes(e.status)) return '지금 Google Gemini 서버가 붐벼서 답을 받지 못했어요. 잠시 후 다시 시도해 주세요.';
     if (e.name === 'AbortError') return 'Gemini 응답이 너무 오래 걸렸어요.';
     return 'Gemini에서 답을 받지 못했어요.';
 }
@@ -359,6 +386,100 @@ function cleanCurate(r) {
     };
 }
 
+// ─────────────────────────── 3) AI 채팅
+
+const CHAT_SCHEMA = {
+    type: 'object',
+    properties: {
+        reply: { type: 'string', description: '사용자에게 하는 답장 (2~3문장 이내, 마크다운 없이)' },
+        picks: {
+            type: 'array', maxItems: 3, description: '추천 영화 0~3편. 추천할 상황이 아니면 빈 배열',
+            items: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string' }, originalTitle: { type: 'string' }, year: { type: 'integer' },
+                    reason: { type: 'string', description: '사용자가 말한 조건과 연결한 추천 이유 1문장' },
+                },
+                required: ['title', 'originalTitle', 'year', 'reason'],
+            },
+        },
+        chips: { type: 'array', items: { type: 'string' }, description: '사용자가 눌러서 바로 보낼 짧은 답장 예시 2~4개' },
+    },
+    required: ['reply', 'picks', 'chips'],
+};
+
+const CHAT_RULES = `${SYSTEM}
+대화 규칙:
+- 사용자의 말에서 원하는 분위기, 장르, 싫은 것, 같이 보는 사람, 볼 시간 등을 파악해서 추천해.
+- 한 번에 1~3편을 추천하고, 이 대화에서 이미 추천한 영화는 사용자가 원하지 않는 한 다시 추천하지 마.
+- 인사나 잡담처럼 추천할 상황이 아니면 picks 는 빈 배열로 두고, 취향을 묻는 질문을 reply 에 넣어.
+- 영화 추천과 관계없는 요청(숙제, 코딩 등)은 정중히 거절하고 영화 이야기로 돌아와.`;
+
+// 키워드 사전 (기본 모드에서 사용자의 말 → 영화 태그)
+const CHAT_WORDS = {
+    웃음: ['웃', '재밌', '코미디', '유쾌', '가볍'], 위로: ['위로', '힘들', '우울', '지쳤', '지친'],
+    설렘: ['설레', '로맨스', '연애', '사랑', '데이트'], 긴장: ['긴장', '스릴', '무서', '공포', '쫄깃'],
+    몰입: ['몰입', '빠져', '심심', '반전'], 생각: ['생각', '여운', '철학', '깊은'],
+    통쾌: ['통쾌', '액션', '스트레스', '시원'], 힐링: ['힐링', '편안', '잔잔', '쉬고'],
+    감동: ['감동', '울고', '눈물', '뭉클'], 동기부여: ['동기', '의욕', '열정', '자극'],
+};
+
+function basicChat(messages) {
+    const said = new Set(messages.filter(m => m.role === 'assistant').flatMap(m => (m.content.match(/「([^」]+)」/g) || []).map(t => t.slice(1, -1))));
+    // "공포는 빼고"처럼 싫다고 한 단어는 지우고 키워드 찾기
+    const tagsOf = str => {
+        const clean = str.replace(/\S+?(은|는|이|가)?\s*(빼고|빼줘|말고|제외)/g, ' ');
+        return Object.entries(CHAT_WORDS).filter(([, words]) => words.some(w => clean.includes(w))).map(([t]) => t);
+    };
+    const users = messages.filter(m => m.role === 'user');
+    const last = users[users.length - 1].content;
+    const more = /다른|또|더/.test(last);
+    let tags = tagsOf(last);
+    if (!tags.length && more) {   // "다른 거"만 말하면 앞에서 말한 취향을 그대로 이어가기
+        for (let i = users.length - 2; i >= 0 && !tags.length; i--) tags = tagsOf(users[i].content);
+    }
+    if (!tags.length && !more) {
+        return {
+            reply: '어떤 느낌의 영화가 보고 싶으세요? 지금 기분이나 원하는 분위기를 편하게 말해 주세요.',
+            picks: [], chips: ['웃긴 영화 추천해줘', '울고 싶어', '긴장감 넘치는 거', '잔잔한 힐링 영화'],
+        };
+    }
+    const picks = BASIC_MOVIES
+        .filter(m => !said.has(m.title))
+        .map(m => ({ m, hit: m.tags.filter(t => tags.includes(t)).length, r: Math.random() }))
+        .sort((a, b) => b.hit - a.hit || a.r - b.r)
+        .filter((x, i) => i === 0 || !tags.length || x.hit > 0)   // 조건과 안 맞는 영화는 빼기
+        .slice(0, 3)
+        .map(({ m }) => ({ ...m, reason: `${m.genres.join('·')} 영화로, ${m.tags.filter(t => tags.includes(t)).map(t => '#' + t).join(' ') || '말씀하신'} 분위기에 잘 맞아요.` }));
+    return {
+        reply: more ? `이번엔 다른 영화로 골라봤어요${tags.length ? ` (${tags.map(t => '#' + t).join(' ')})` : ''}.` : `${tags.map(t => '#' + t).join(' ')} 느낌으로 골라봤어요.`,
+        picks, chips: ['다른 거 추천해줘', '더 가벼운 거', '혼자 보기 좋은 거'],
+    };
+}
+
+async function chat(messages) {
+    if (apiKey()) {
+        try {
+            const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+            return { source: 'gemini', ...(await askGemini(CHAT_RULES, contents, CHAT_SCHEMA)) };
+        } catch (e) {
+            console.error('[승우 AI] 채팅 실패:', e.status || '', e.message);
+            return { source: 'basic', notice: errorMessage(e), ...basicChat(messages) };
+        }
+    }
+    return { source: 'basic', ...basicChat(messages) };
+}
+
+function cleanMessages(list) {
+    if (!Array.isArray(list)) return null;
+    const out = list
+        .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+        .map(m => ({ role: m.role, content: m.content.slice(0, 600) }))
+        .slice(-20);   // 최근 20개만 (비용 절약)
+    while (out.length && out[0].role !== 'user') out.shift();   // Gemini 는 사용자 말로 시작해야 함
+    return out.length && out[out.length - 1].role === 'user' ? out : null;
+}
+
 // ─────────────────────────── 라우트 등록
 
 module.exports = function registerSeungwooApi(app) {
@@ -382,6 +503,20 @@ module.exports = function registerSeungwooApi(app) {
             catalog: (Array.isArray(b.catalog) ? b.catalog : []).slice(0, 80).map(t => text(t, 80)),
         };
         res.json(cleanCurate(await curate(input)));
+    });
+
+    app.post('/api/seungwoo/chat', async (req, res) => {
+        const messages = cleanMessages(req.body?.messages);
+        if (!messages) return res.status(400).json({ message: '보낼 메시지가 없어요.' });
+        const r = await chat(messages);
+        res.json({
+            source: r.source, notice: r.notice || '', reply: text(r.reply, 600),
+            picks: (Array.isArray(r.picks) ? r.picks : []).slice(0, 3).map(p => ({
+                title: text(p.title, 80), originalTitle: text(p.originalTitle, 120),
+                year: Number(p.year) || null, reason: text(p.reason),
+            })),
+            chips: (Array.isArray(r.chips) ? r.chips : []).slice(0, 4).map(c => text(c, 40)),
+        });
     });
 
     console.log(apiKey()
