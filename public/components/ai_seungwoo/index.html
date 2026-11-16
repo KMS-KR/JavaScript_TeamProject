@@ -1,0 +1,47 @@
+<!-- 승우: AI 추천 탭. 다른 컴포넌트와 안 겹치게 클래스는 전부 sw- 로 시작 -->
+<div class="sw">
+
+    <header class="sw-intro">
+        <p class="sw-kicker">고르다 지친 당신을 위해</p>
+        <h1 class="sw-headline">오늘 볼 영화, <em>AI가 대신 골라드려요</em></h1>
+    </header>
+
+    <!-- 1. 오늘의 AI 픽 -->
+    <section class="sw-section" aria-labelledby="sw-today-title">
+        <div class="sw-section-head">
+            <h2 class="sw-section-title" id="sw-today-title">오늘의 AI 픽</h2>
+            <p class="sw-section-sub" id="sw-today-date"></p>
+        </div>
+        <article class="sw-today" id="sw-today" aria-live="polite">
+            <div class="sw-loading">AI가 오늘의 영화를 고르는 중이에요...</div>
+        </article>
+    </section>
+
+    <!-- 2. 상황별 맞춤 큐레이션 -->
+    <section class="sw-section" aria-labelledby="sw-curate-title">
+        <div class="sw-section-head">
+            <h2 class="sw-section-title" id="sw-curate-title">상황별 맞춤 큐레이션</h2>
+            <p class="sw-section-sub">지금 상황 세 가지만 골라 주세요. 나머지는 AI가 분석해요.</p>
+        </div>
+
+        <div class="sw-picker">
+            <div class="sw-step">
+                <h3 class="sw-step-title"><span>1</span>지금 날씨는?</h3>
+                <div class="sw-chips" data-key="weather"></div>
+            </div>
+            <div class="sw-step">
+                <h3 class="sw-step-title"><span>2</span>오늘은 무슨 요일?</h3>
+                <div class="sw-chips" data-key="day"></div>
+            </div>
+            <div class="sw-step">
+                <h3 class="sw-step-title"><span>3</span>지금 기분은?</h3>
+                <div class="sw-chips" data-key="mood"></div>
+            </div>
+            <button type="button" class="sw-go" id="sw-go" disabled>날씨와 기분을 골라 주세요</button>
+        </div>
+
+        <div class="sw-result" id="sw-result" aria-live="polite"></div>
+    </section>
+
+    <p class="sw-foot" id="sw-foot"></p>
+</div>
