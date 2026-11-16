@@ -79,13 +79,16 @@ function renderTagGroups() {
 // ── 검색 규칙
 // 같은 묶음 안에서는 하나만 맞아도 OK (액션 또는 스릴러)
 // 다른 묶음끼리는 모두 맞아야 함 (장르도 맞고 기분도 맞고)
-function matches(item) {
-    if (state.keyword && !item.title.toLowerCase().includes(state.keyword)) return false;
+function matchesTags(item) {
     return TAG_GROUPS.every(g => {
         const picked = state.tags[g.key];
         if (picked.length === 0) return true;
         return picked.some(t => item[g.key].includes(t));
     });
+}
+
+function matchesKeyword(item) {
+    return !state.keyword || item.title.toLowerCase().includes(state.keyword);
 }
 
 // 선택한 태그와 몇 개나 겹치는지 (많이 겹칠수록 위로)
@@ -101,14 +104,68 @@ function pickedTags() {
     return TAG_GROUPS.flatMap(g => state.tags[g.key]);
 }
 
-// ── 화면 그리기: 결과
-function renderResults() {
+function byRank(a, b) {
+    return score(b) - score(a) || (a.rank ?? 0) - (b.rank ?? 0) || b.year - a.year;
+}
+
+// 지금 보여줄 플랫폼 (구독 중인 OTT만 보기 체크 반영)
+function visiblePlatforms() {
+    return state.onlyMine ? PLATFORMS.filter(p => state.myOtts.includes(p.id)) : PLATFORMS;
+}
+
+// ── 결과 만들기 (1) 내 브라우저가 가진 목록에서 찾기
+//    태그를 안 골랐을 때, 그리고 샘플 데이터로 동작할 때 사용
+//    모자라면 태그가 하나라도 맞는 작품을 "비슷한 작품"으로 채움
+function searchLocal(platformId) {
+    const mine = CONTENTS.filter(item => item.platform === platformId);
+    const exact = mine.filter(matchesTags).sort(byRank).slice(0, MAX_PER_PLATFORM);
+    if (pickedTags().length === 0 || exact.length >= MAX_PER_PLATFORM) return exact;
+
+    const similar = mine
+        .filter(item => !exact.includes(item) && score(item) > 0)
+        .sort(byRank)
+        .slice(0, MAX_PER_PLATFORM - exact.length)
+        .map(item => ({ ...item, similar: true }));
+    return [...exact, ...similar];
+}
+
+// ── 결과 만들기 (2) 서버에 태그 조건을 보내서 TMDB에서 직접 찾기
+//    서버가 플랫폼마다 최대 10개를 채워서 돌려줌 (모자라면 비슷한 작품 포함)
+async function searchServer(platforms) {
+    const params = new URLSearchParams();
+    TAG_GROUPS.forEach(g => {
+        if (state.tags[g.key].length) params.set(g.key, state.tags[g.key].join(','));
+    });
+    params.set('otts', platforms.map(p => p.id).join(','));
+    const res = await fetch('/api/jongwon/search?' + params);
+    if (!res.ok) throw new Error('search failed');
+    return (await res.json()).platforms || {};
+}
+
+// ── 화면 그리기: 카드 한 장
+function cardHtml(item, i, p, picked) {
+    const tags = [...item.genres, ...item.moods];
+    return `
+        <article class="sj-card ${item.poster ? 'has-poster' : ''} ${item.similar ? 'similar' : ''}" style="--sj-color:${p.color}">
+            ${item.poster ? `<img class="sj-card-poster" src="${esc(item.poster)}" alt="${esc(item.title)} 포스터" loading="lazy">` : ''}
+            <div class="sj-card-rank">${i + 1}</div>
+            ${item.similar ? '<div class="sj-card-similar">비슷한 작품</div>' : ''}
+            <div class="sj-card-title">${esc(item.title)}</div>
+            <div class="sj-card-meta">${[item.year, item.type, item.country[0]].filter(Boolean).map(esc).join(' · ')}</div>
+            <div class="sj-card-line">${esc(item.line) || '줄거리 정보가 아직 없어요.'}</div>
+            <div class="sj-card-tags">
+                ${tags.map(t => `<span class="${picked.includes(t) ? 'hit' : ''}">#${esc(t)}</span>`).join('')}
+            </div>
+        </article>`;
+}
+
+// ── 화면 그리기: 결과 전체
+let searchSeq = 0;   // 태그를 빠르게 여러 번 누르면, 늦게 도착한 예전 결과는 버리기 위한 번호
+
+async function renderResults() {
+    const seq = ++searchSeq;
     const picked = pickedTags();
-
-    // 보여줄 플랫폼 정하기
-    let platforms = PLATFORMS;
-    if (state.onlyMine) platforms = PLATFORMS.filter(p => state.myOtts.includes(p.id));
-
+    const platforms = visiblePlatforms();
     const summary = document.getElementById('sj-summary');
     const results = document.getElementById('sj-results');
 
@@ -118,45 +175,47 @@ function renderResults() {
         return;
     }
 
-    let total = 0;
+    // 플랫폼별 결과 모으기
+    let lists = null;
+    if (source === 'tmdb' && picked.length > 0) {
+        summary.textContent = '조건에 맞는 작품을 찾는 중이에요...';
+        results.classList.add('loading');
+        try {
+            lists = await searchServer(platforms);
+        } catch (e) { /* 서버 검색 실패 → 아래에서 내 목록으로 대신 찾음 */ }
+        if (seq !== searchSeq || !document.getElementById('sj-results')) return;   // 그사이 다른 태그를 눌렀거나 페이지를 떠남
+        results.classList.remove('loading');
+    }
+    const listOf = p => (lists ? lists[p.id] || [] : searchLocal(p.id)).filter(matchesKeyword);
+
+    let exactTotal = 0;
+    let similarTotal = 0;
     const rowsHtml = platforms.map(p => {
-        const list = CONTENTS
-            .filter(item => item.platform === p.id && matches(item))
-            .sort((a, b) => score(b) - score(a) || (a.rank ?? 0) - (b.rank ?? 0) || b.year - a.year)
-            .slice(0, MAX_PER_PLATFORM);
-        total += list.length;
+        const list = listOf(p);
+        const similarCount = list.filter(item => item.similar).length;
+        exactTotal += list.length - similarCount;
+        similarTotal += similarCount;
 
-        const cards = list.map((item, i) => {
-            const tags = [...item.genres, ...item.moods];
-            return `
-                <article class="sj-card ${item.poster ? 'has-poster' : ''}" style="--sj-color:${p.color}">
-                    ${item.poster ? `<img class="sj-card-poster" src="${esc(item.poster)}" alt="${esc(item.title)} 포스터" loading="lazy">` : ''}
-                    <div class="sj-card-rank">${i + 1}</div>
-                    <div class="sj-card-title">${esc(item.title)}</div>
-                    <div class="sj-card-meta">${[item.year, item.type, item.country[0]].filter(Boolean).map(esc).join(' · ')}</div>
-                    <div class="sj-card-line">${esc(item.line) || '줄거리 정보가 아직 없어요.'}</div>
-                    <div class="sj-card-tags">
-                        ${tags.map(t => `<span class="${picked.includes(t) ? 'hit' : ''}">#${esc(t)}</span>`).join('')}
-                    </div>
-                </article>`;
-        }).join('');
-
+        const countText = similarCount
+            ? `${list.length}개 <span class="sj-row-similar">(비슷한 작품 ${similarCount}개 포함)</span>`
+            : `${list.length}개`;
         return `
             <section class="sj-row" style="--sj-color:${p.color}">
                 <div class="sj-row-head">
                     <span class="sj-row-name">${p.name}</span>
-                    <span class="sj-row-count">${list.length}개</span>
+                    <span class="sj-row-count">${countText}</span>
                     ${state.myOtts.includes(p.id) ? '<span class="sj-row-mine">구독 중</span>' : ''}
                 </div>
                 ${list.length
-                    ? `<div class="sj-scroll">${cards}</div>`
+                    ? `<div class="sj-scroll">${list.map((item, i) => cardHtml(item, i, p, picked)).join('')}</div>`
                     : '<div class="sj-empty">조건에 맞는 작품이 없어요. 태그를 줄여보세요.</div>'}
             </section>`;
     }).join('');
 
     const tagText = picked.length ? picked.map(t => '#' + t).join(' ') : '전체';
     const keywordText = state.keyword ? ` · 제목에 "${esc(state.keyword)}"` : '';
-    summary.innerHTML = `<strong>${tagText}</strong>${keywordText} 검색 결과 · ${platforms.length}개 플랫폼에서 <strong>${total}개</strong>`;
+    const similarText = similarTotal ? ` + 비슷한 작품 ${similarTotal}개` : '';
+    summary.innerHTML = `<strong>${tagText}</strong>${keywordText} 검색 결과 · ${platforms.length}개 플랫폼에서 <strong>${exactTotal}개</strong>${similarText}`;
     results.innerHTML = rowsHtml;
 
     document.getElementById('sj-source').textContent = source === 'tmdb'
