@@ -34,6 +34,14 @@
 .sp-item strong { margin-top: 4px; font-size: 0.92rem; line-height: 1.35; word-break: keep-all; }
 .sp-item span { color: var(--sp-muted); font-size: 0.78rem; }
 
+/* 영화 / 시리즈 표시 */
+.sp-thumb { position: relative; display: block; }
+.sp-thumb .sp-type { position: absolute; top: 6px; left: 6px; }
+.sp-type { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; font-style: normal; color: #fff; }
+.sp-type-movie { background: rgba(242,85,90,0.92); }
+.sp-type-tv { background: rgba(124,92,255,0.95); }
+.sp-warn .sp-type { margin-right: 8px; vertical-align: 1px; }
+
 /* 포스터 */
 .sp-poster { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; background: #222; }
 .sp-poster-empty { display: grid; place-items: center; background: linear-gradient(160deg, #3a2430, #14161c); }
@@ -49,6 +57,16 @@
 .sp-title small { display: block; margin-top: 4px; font-size: 0.95rem; font-weight: 500; color: var(--sp-muted); }
 .sp-overview { margin: 14px 0 0; color: #cfd3dc; line-height: 1.7; font-size: 0.95rem; }
 .sp-overview span { display: inline-block; margin-right: 8px; padding: 2px 8px; border-radius: 5px; background: #23324a; color: #9ec3ff; font-size: 0.75rem; font-weight: 700; vertical-align: 1px; }
+
+/* 볼 수 있는 OTT */
+.sp-ott { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; }
+.sp-ott-label { color: var(--sp-muted); font-size: 0.82rem; font-weight: 700; }
+.sp-ott-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-ott-list li { display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: #232733; border: 1px solid var(--sp-line); font-size: 0.82rem; }
+.sp-ott-list img { width: 22px; height: 22px; border-radius: 6px; }
+.sp-ott-credit { color: var(--sp-muted); font-size: 0.72rem; }
+.sp-ott-credit a { color: inherit; }
+.sp-block-tag { margin-left: 6px; padding: 2px 7px; border-radius: 5px; background: rgba(242,85,90,0.16); color: #ff9a9e; font-size: 0.72rem; font-weight: 700; vertical-align: 2px; }
 
 .sp-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--sp-line); }
 .sp-badge { padding: 4px 10px; border-radius: 6px; background: rgba(185,140,255,0.14); color: var(--sp-violet); font-size: 0.8rem; font-weight: 700; }
