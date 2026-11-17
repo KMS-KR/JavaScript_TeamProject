@@ -1,11 +1,13 @@
 // 승우: AI 추천 탭 서버 API (Google Gemini API 사용)
 //
 //  1) 오늘의 AI 픽     GET  /api/seungwoo/today?date=2026-11-14
-//     → 요일별 테마에 맞는 영화 한 편 + 상세 추천 이유 (하루에 한 번만 AI 호출, 나머지는 저장된 값)
-//  2) 상황별 큐레이션  POST /api/seungwoo/curate  { weather, day, mood, hour, catalog }
-//     → 날씨·요일·기분을 분석해서 메인 추천 1편 + 대안 2편
+//     → 요일별 테마에 맞는 영화 또는 OTT 시리즈 한 편 + 상세 추천 이유 (하루에 한 번만 AI 호출, 나머지는 저장된 값)
+//  2) 상황별 큐레이션  POST /api/seungwoo/curate  { weather, day, mood, hour, ott, catalog }
+//     → 날씨·요일·기분을 분석해서 메인 추천 1편 + 대안 2편 (영화 + 시리즈)
+//     → ott 를 고르면(netflix, tving, disney, wavve, watcha) 그 OTT 에서 볼 수 있는 작품만 (TMDB 로 확인)
+//  1)·2) 는 추천한 작품마다 TMDB 에서 포스터, 시즌 수, 국내에서 볼 수 있는 OTT 를 찾아 붙여서 보냄
 //  3) AI 채팅          POST /api/seungwoo/chat    { messages: [{ role, content }] }
-//     → 자유롭게 대화하면서 영화 추천 (답장 + 추천 0~3편 + 빠른 답장 버튼)
+//     → 자유롭게 대화하면서 영화 추천 (답장 + 추천 0~3편 + 빠른 답장 버튼). 채팅은 지금처럼 영화만
 //  4) 스포일러         GET  /api/seungwoo/spoiler/search?query=오징어 게임   (영화 + OTT 시리즈 검색)
 //                      GET  /api/seungwoo/spoiler?type=tv&tmdbId=93405   (type: movie | tv, 또는 ?title=기생충)
 //     → 위키백과 줄거리를 근거로 줄거리 + 결말을 한 번에 (화면에서는 블러로 가려 둠)
@@ -15,7 +17,7 @@
 //   .env 예시 (server.js 와 같은 폴더)
 //     GEMINI_API_KEY=발급받은키
 //     GEMINI_MODEL=gemini-3.5-flash-lite      ← 생략하면 이 모델
-// 키가 없거나 Gemini 호출이 실패하면 아래 BASIC_MOVIES 로 규칙 기반 추천을 대신 보여줍니다.
+// 키가 없거나 Gemini 호출이 실패하면 아래 BASIC_MOVIES·BASIC_SERIES 로 규칙 기반 추천을 대신 보여줍니다.
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 const apiKey = () => (process.env.GEMINI_API_KEY || '').trim();
@@ -41,20 +43,20 @@ const MOODS = {
 
 // ── 요일별 테마 (요일 × 2개, 주마다 번갈아 나옴 → 매일 다른 테마)
 const THEMES = {
-    0: [{ name: '일요일 오후의 힐링', desc: '느긋하게 마음을 쉬게 해 주는 영화', tags: ['힐링', '감성'] },
-        { name: '월요일 앞두고 마음 다독이기', desc: '내일을 버틸 힘을 주는 따뜻한 영화', tags: ['위로', '감동'] }],
-    1: [{ name: '월요병 퇴치 처방전', desc: '처진 기운을 끌어올려 주는 영화', tags: ['동기부여', '통쾌'] },
-        { name: '새로운 한 주를 여는 희망', desc: '다시 해 볼 용기를 주는 영화', tags: ['위로', '동기부여'] }],
-    2: [{ name: '화요일의 작은 일탈', desc: '평범한 하루에 웃음과 설렘을 더하는 영화', tags: ['웃음', '설렘'] },
-        { name: '머리를 깨우는 반전 명작', desc: '끝까지 집중하게 만드는 영화', tags: ['몰입', '생각'] }],
-    3: [{ name: '한 주의 반환점, 쉬어가기', desc: '지친 수요일을 달래 주는 영화', tags: ['힐링', '위로'] },
-        { name: '수요일 밤 몰입 시네마', desc: '시간 가는 줄 모르는 영화', tags: ['몰입', '긴장'] }],
-    4: [{ name: '목요일의 설렘 충전', desc: '마음이 몽글몽글해지는 영화', tags: ['설렘', '감성'] },
-        { name: '명대사가 오래 남는 영화', desc: '보고 나서도 계속 생각나는 영화', tags: ['감동', '생각'] }],
-    5: [{ name: '불금엔 스트레스 날리기', desc: '한 주의 피로를 시원하게 날리는 영화', tags: ['통쾌', '웃음'] },
-        { name: '금요일 밤 서늘한 스릴러', desc: '불 끄고 보기 좋은 긴장감 있는 영화', tags: ['긴장', '몰입'] }],
-    6: [{ name: '주말에 만나는 인생 영화', desc: '두고두고 이야기하게 될 명작', tags: ['감동', '몰입'] },
-        { name: '친구랑 보면 웃음 보장', desc: '같이 보면 두 배로 재밌는 영화', tags: ['웃음', '통쾌'] }],
+    0: [{ name: '일요일 오후의 힐링', desc: '느긋하게 마음을 쉬게 해 주는 작품', tags: ['힐링', '감성'] },
+        { name: '월요일 앞두고 마음 다독이기', desc: '내일을 버틸 힘을 주는 따뜻한 작품', tags: ['위로', '감동'] }],
+    1: [{ name: '월요병 퇴치 처방전', desc: '처진 기운을 끌어올려 주는 작품', tags: ['동기부여', '통쾌'] },
+        { name: '새로운 한 주를 여는 희망', desc: '다시 해 볼 용기를 주는 작품', tags: ['위로', '동기부여'] }],
+    2: [{ name: '화요일의 작은 일탈', desc: '평범한 하루에 웃음과 설렘을 더하는 작품', tags: ['웃음', '설렘'] },
+        { name: '머리를 깨우는 반전 명작', desc: '끝까지 집중하게 만드는 작품', tags: ['몰입', '생각'] }],
+    3: [{ name: '한 주의 반환점, 쉬어가기', desc: '지친 수요일을 달래 주는 작품', tags: ['힐링', '위로'] },
+        { name: '수요일 밤 몰입 시네마', desc: '시간 가는 줄 모르는 작품', tags: ['몰입', '긴장'] }],
+    4: [{ name: '목요일의 설렘 충전', desc: '마음이 몽글몽글해지는 작품', tags: ['설렘', '감성'] },
+        { name: '명대사가 오래 남는 작품', desc: '보고 나서도 계속 생각나는 작품', tags: ['감동', '생각'] }],
+    5: [{ name: '불금엔 스트레스 날리기', desc: '한 주의 피로를 시원하게 날리는 작품', tags: ['통쾌', '웃음'] },
+        { name: '금요일 밤 서늘한 스릴러', desc: '불 끄고 보기 좋은 긴장감 있는 작품', tags: ['긴장', '몰입'] }],
+    6: [{ name: '주말에 만나는 인생 작품', desc: '두고두고 이야기하게 될 명작', tags: ['감동', '몰입'] },
+        { name: '친구랑 보면 웃음 보장', desc: '같이 보면 두 배로 재밌는 작품', tags: ['웃음', '통쾌'] }],
 };
 
 // ── 기본 모드(AI 없이)용 영화 목록
@@ -91,7 +93,26 @@ const BASIC_MOVIES = [
     ['코코', 'Coco', 2017, '리 언크리치', ['애니메이션', '음악'], ['감동', '위로']],
     ['월터의 상상은 현실이 된다', 'The Secret Life of Walter Mitty', 2013, '벤 스틸러', ['모험', '드라마'], ['동기부여', '힐링', '맑음', '추움']],
     ['서울의 봄', '12.12: The Day', 2023, '김성수', ['드라마', '역사'], ['긴장', '몰입']],
-].map(([title, originalTitle, year, director, genres, tags]) => ({ title, originalTitle, year, director, genres, tags }));
+].map(([title, originalTitle, year, director, genres, tags]) => ({ type: 'movie', title, originalTitle, year, director, genres, tags }));
+
+// ── 기본 모드용 OTT 시리즈 목록 (director 는 연출 또는 크리에이터)
+const BASIC_SERIES = [
+    ['오징어 게임', 'Squid Game', 2021, '황동혁', ['스릴러', '드라마'], ['긴장', '몰입']],
+    ['슬기로운 의사생활', 'Hospital Playlist', 2020, '신원호', ['드라마', '코미디'], ['힐링', '위로', '웃음']],
+    ['나의 아저씨', 'My Mister', 2018, '김원석', ['드라마'], ['위로', '감동', '생각', '흐림', '추움']],
+    ['동백꽃 필 무렵', 'When the Camellia Blooms', 2019, '차영훈', ['로맨스', '코미디'], ['설렘', '웃음', '감동']],
+    ['이상한 변호사 우영우', 'Extraordinary Attorney Woo', 2022, '유인식', ['드라마', '코미디'], ['힐링', '감동', '웃음', '맑음']],
+    ['더 글로리', 'The Glory', 2022, '안길호', ['스릴러', '드라마'], ['통쾌', '긴장', '몰입']],
+    ['무빙', 'Moving', 2023, '박인제', ['액션', '판타지'], ['몰입', '통쾌', '감동']],
+    ['기묘한 이야기', 'Stranger Things', 2016, '더퍼 형제', ['SF', '공포'], ['몰입', '긴장', '추움']],
+    ['브레이킹 배드', 'Breaking Bad', 2008, '빈스 길리건', ['범죄', '드라마'], ['긴장', '몰입', '생각']],
+    ['프렌즈', 'Friends', 1994, '데이비드 크레인·마르타 카우프먼', ['코미디', '로맨스'], ['웃음', '힐링']],
+    ['응답하라 1988', 'Reply 1988', 2015, '신원호', ['드라마', '코미디'], ['감동', '웃음', '위로', '눈', '추움']],
+    ['갯마을 차차차', 'Hometown Cha-Cha-Cha', 2021, '유제원', ['로맨스', '코미디'], ['힐링', '설렘', '맑음', '더움']],
+].map(([title, originalTitle, year, director, genres, tags]) => ({ type: 'tv', title, originalTitle, year, director, genres, tags }));
+const BASIC_WORKS = [...BASIC_MOVIES, ...BASIC_SERIES];
+const kindWord = m => (m.type === 'tv' ? '시리즈' : '영화');
+const makerWord = m => (m.type === 'tv' ? '연출' : '감독');
 
 // ─────────────────────────── 공통 도구
 
@@ -220,18 +241,90 @@ const MOVIE_FIELDS = {
     genres: { type: 'array', items: { type: 'string' }, description: '장르 1~3개' },
 };
 
+// 오늘의 AI 픽·큐레이션용 (영화 + 시리즈). 채팅은 위의 SYSTEM·MOVIE_FIELDS 를 그대로 씀
+const SYSTEM_WORKS = `너는 OTT 추천 사이트 "All-in-OTT"의 영화·시리즈 큐레이터야.
+사용자는 볼 작품을 못 고르는 선택장애 20대야. 망설이지 않게 확신 있는 말투로, 친구처럼 다정한 존댓말로 추천해.
+규칙:
+- 실제로 공개된, 널리 알려진 영화나 시리즈(드라마, 넷플릭스·디즈니+ 같은 OTT 오리지널 시리즈)만 추천해. 존재하지 않는 작품이나 확실하지 않은 정보는 절대 지어내지 마.
+- 영화만 고르지 말고, 상황에 잘 맞으면 시리즈도 자연스럽게 섞어서 추천해.
+- type 은 영화면 movie, 시리즈면 tv 야. title 은 한국에서 공개된 한국어 제목, originalTitle 은 원제, year 는 개봉 연도(시리즈는 첫 방영 연도)야.
+- 예능, 토크쇼, 뉴스 같은 프로그램은 추천하지 마.
+- 스포일러(결말, 반전 내용)는 절대 쓰지 마.
+- 마크다운, 이모지 목록 형식은 쓰지 말고 자연스러운 문장으로 써.`;
+
+const WORK_FIELDS = {
+    type: { type: 'string', enum: ['movie', 'tv'], description: 'movie = 영화, tv = 시리즈' },
+    title: { type: 'string', description: '한국 공개 제목' },
+    originalTitle: { type: 'string', description: '원제' },
+    year: { type: 'integer', description: '개봉 연도 (시리즈는 첫 방영 연도)' },
+    director: { type: 'string', description: '영화는 감독, 시리즈는 연출 또는 크리에이터 이름 (한국어)' },
+    genres: { type: 'array', items: { type: 'string' }, description: '장르 1~3개' },
+};
+const WORK_REQUIRED = ['type', 'title', 'originalTitle', 'year', 'director', 'genres'];
+
+// ── 추천 작품에 TMDB 정보 붙이기 (포스터, 시즌 수, 국내 OTT). TMDB 키가 없으면 그대로
+const OTT_LIST = {
+    netflix: { name: '넷플릭스', re: /^netflix/i }, tving: { name: '티빙', re: /^tving/i },
+    disney: { name: '디즈니+', re: /^disney/i }, wavve: { name: '웨이브', re: /^wavve/i }, watcha: { name: '왓챠', re: /^watcha/i },
+};
+const ottIdOf = name => Object.keys(OTT_LIST).find(k => OTT_LIST[k].re.test(name)) || '';
+const workCache = new Map();   // 같은 작품은 12시간 동안 다시 찾지 않음
+
+async function findWork(pick) {
+    const key = `${pick.type}|${pick.title}|${pick.year}`;
+    const hit = workCache.get(key);
+    if (hit && hit.expires > Date.now()) return hit.value;
+    let found = null;
+    for (const q of [...new Set([pick.title, pick.originalTitle].filter(Boolean))]) {
+        const results = await tmdbSearchWorks(q);
+        if (!results) return null;   // TMDB 키 없음
+        const yearOk = r => !pick.year || !r.year || Math.abs(r.year - pick.year) <= 1;
+        found = results.find(r => r.type === pick.type && yearOk(r)) || results.find(r => yearOk(r) && r.title === pick.title);
+        if (found) break;
+    }
+    const value = found ? await tmdbWork(found.type, found.id) : null;
+    if (value) value.tmdbId = found.id;
+    if (workCache.size >= 300) workCache.delete(workCache.keys().next().value);
+    workCache.set(key, { value, expires: Date.now() + 12 * 3600000 });
+    return value;
+}
+
+async function enrich(pick) {
+    let w = null;
+    try { w = await findWork(pick); }
+    catch (e) { console.error('[승우 AI] TMDB 정보 찾기 실패:', pick.title, e.status || '', e.message); }
+    const providers = w?.providers
+        ? { ...w.providers, list: w.providers.list.map(p => ({ ...p, id: ottIdOf(p.name) })) }
+        : null;
+    return {
+        ...pick,
+        type: w?.type || pick.type, tmdbId: w?.tmdbId || null,
+        seasons: w?.seasons ?? null, poster: w?.poster || '', providers,
+        checked: Boolean(w),   // TMDB 에서 찾았는지 (못 찾았으면 OTT 정보를 확인 못 한 것)
+    };
+}
+
+// 화면에 보내기 전에 작품 값 정리 (이상한 값·너무 긴 글 막기)
+const cleanWork = m => ({
+    type: m?.type === 'tv' ? 'tv' : 'movie',
+    title: text(m?.title, 80), originalTitle: text(m?.originalTitle, 120), year: Number(m?.year) || null,
+    director: text(m?.director, 60), genres: (Array.isArray(m?.genres) ? m.genres : []).slice(0, 3).map(g => text(g, 20)),
+    seasons: Number.isInteger(m?.seasons) ? m.seasons : null, poster: m?.poster || '', providers: m?.providers || null,
+    tmdbId: m?.tmdbId || null,
+});
+
 // ─────────────────────────── 1) 오늘의 AI 픽
 
 const TODAY_SCHEMA = {
     type: 'object',
     properties: {
-        ...MOVIE_FIELDS,
-        hook: { type: 'string', description: '이 영화를 한 문장으로 소개 (스포일러 없이)' },
-        whyToday: { type: 'string', description: '오늘 테마·요일·계절에 이 영화가 어울리는 이유 2~3문장' },
+        ...WORK_FIELDS,
+        hook: { type: 'string', description: '이 작품을 한 문장으로 소개 (스포일러 없이)' },
+        whyToday: { type: 'string', description: '오늘 테마·요일·계절에 이 작품이 어울리는 이유 2~3문장' },
         watchPoint: { type: 'string', description: '보면서 주목할 관전 포인트 2~3문장' },
         forWhom: { type: 'string', description: '이런 사람에게 특히 추천 1~2문장' },
     },
-    required: ['title', 'originalTitle', 'year', 'director', 'genres', 'hook', 'whyToday', 'watchPoint', 'forWhom'],
+    required: [...WORK_REQUIRED, 'hook', 'whyToday', 'watchPoint', 'forWhom'],
 };
 
 const todayCache = new Map();   // 날짜 → 결과 (하루에 AI는 한 번만 호출)
@@ -239,14 +332,14 @@ const recentPicks = [];         // 최근 추천한 제목 (겹치지 않게)
 
 function basicToday(date, theme) {
     const recent = new Set(recentPicks);
-    const scored = BASIC_MOVIES
+    const scored = BASIC_WORKS
         .filter(m => !recent.has(m.title))
         .map(m => ({ m, s: m.tags.filter(t => theme.tags.includes(t)).length * 10 + seeded(date.toDateString() + m.title) * 9 }))
         .sort((a, b) => b.s - a.s);
-    const m = (scored[0] || { m: BASIC_MOVIES[0] }).m;
+    const m = (scored[0] || { m: BASIC_WORKS[0] }).m;
     return {
         ...m,
-        hook: `${m.director} 감독의 ${m.genres.join('·')} 영화예요.`,
+        hook: `${m.director} ${makerWord(m)}의 ${m.genres.join('·')} ${kindWord(m)}예요.`,
         whyToday: `오늘의 테마는 '${theme.name}'이에요. ${theme.desc}를 찾다 보니 이 작품이 가장 잘 맞았어요. (${m.tags.filter(t => theme.tags.includes(t)).map(t => '#' + t).join(' ') || '#' + theme.tags[0]})`,
         watchPoint: `${m.year}년 작품이에요. ${m.genres.join(', ')} 장르를 좋아한다면 끝까지 만족하실 거예요.`,
         forWhom: '오늘 뭘 볼지 고민하느라 시간만 보내고 있다면, 고민하지 말고 이걸로 시작해 보세요.',
@@ -264,10 +357,10 @@ async function getToday(dateStr) {
 
     if (apiKey()) {
         try {
-            movie = await askGemini(SYSTEM, `오늘은 ${label}이고, 계절로는 ${seasonOf(date.getMonth() + 1)}야.
+            movie = await askGemini(SYSTEM_WORKS, `오늘은 ${label}이고, 계절로는 ${seasonOf(date.getMonth() + 1)}야.
 오늘의 테마는 "${theme.name}" (${theme.desc})야.
-이 테마에 딱 맞는 영화 한 편을 골라서 상세한 추천 이유를 써 줘.
-${recentPicks.length ? `최근에 이미 추천한 영화는 빼 줘: ${recentPicks.join(', ')}` : ''}`, TODAY_SCHEMA);
+이 테마에 딱 맞는 작품(영화 또는 시리즈) 한 편을 골라서 상세한 추천 이유를 써 줘.
+${recentPicks.length ? `최근에 이미 추천한 작품은 빼 줘: ${recentPicks.join(', ')}` : ''}`, TODAY_SCHEMA);
             source = 'gemini';
         } catch (e) {
             console.error('[승우 AI] 오늘의 픽 실패:', e.status || '', e.message);
@@ -275,13 +368,12 @@ ${recentPicks.length ? `최근에 이미 추천한 영화는 빼 줘: ${recentPi
         }
     }
     if (!movie) movie = basicToday(date, theme);
+    movie = await enrich({ ...movie, type: movie.type === 'tv' ? 'tv' : 'movie' });
 
     const result = {
         date: key, label, theme, source, notice,
         movie: {
-            title: text(movie.title, 80), originalTitle: text(movie.originalTitle, 120),
-            year: Number(movie.year) || null, director: text(movie.director, 60),
-            genres: (Array.isArray(movie.genres) ? movie.genres : []).slice(0, 3).map(g => text(g, 20)),
+            ...cleanWork(movie),
             hook: text(movie.hook), whyToday: text(movie.whyToday, 500),
             watchPoint: text(movie.watchPoint, 500), forWhom: text(movie.forWhom, 300),
         },
@@ -304,25 +396,44 @@ const CURATE_SCHEMA = {
         main: {
             type: 'object',
             properties: {
-                ...MOVIE_FIELDS,
+                ...WORK_FIELDS,
                 hook: { type: 'string', description: '한 문장 소개 (스포일러 없이)' },
                 reasons: { type: 'array', items: { type: 'string' }, description: '지금 상황에 찰떡인 이유 3개, 각각 1문장', minItems: 3, maxItems: 3 },
             },
-            required: ['title', 'originalTitle', 'year', 'director', 'genres', 'hook', 'reasons'],
+            required: [...WORK_REQUIRED, 'hook', 'reasons'],
         },
         alternatives: {
             type: 'array', minItems: 2, maxItems: 2,
             items: {
                 type: 'object',
-                properties: {
-                    title: { type: 'string' }, originalTitle: { type: 'string' }, year: { type: 'integer' },
-                    reason: { type: 'string', description: '이 영화도 좋은 이유 1문장' },
-                },
-                required: ['title', 'originalTitle', 'year', 'reason'],
+                properties: { ...WORK_FIELDS, reason: { type: 'string', description: '이 작품도 좋은 이유 1문장' } },
+                required: [...WORK_REQUIRED, 'reason'],
             },
         },
     },
     required: ['analysis', 'main', 'alternatives'],
+};
+
+// OTT 를 골랐을 때: 후보를 넉넉히 받은 뒤 TMDB 로 그 OTT 에 있는지 확인해서 3편만 남김
+const POOL_SIZE = 7;
+const CURATE_POOL_SCHEMA = {
+    type: 'object',
+    properties: {
+        analysis: CURATE_SCHEMA.properties.analysis,
+        picks: {
+            type: 'array', minItems: POOL_SIZE, maxItems: POOL_SIZE, description: '상황에 잘 맞는 순서대로',
+            items: {
+                type: 'object',
+                properties: {
+                    ...WORK_FIELDS,
+                    hook: { type: 'string', description: '한 문장 소개 (스포일러 없이)' },
+                    reasons: { type: 'array', items: { type: 'string' }, description: '지금 상황에 찰떡인 이유 3개, 각각 1문장', minItems: 3, maxItems: 3 },
+                },
+                required: [...WORK_REQUIRED, 'hook', 'reasons'],
+            },
+        },
+    },
+    required: ['analysis', 'picks'],
 };
 
 function slotOf(hour) {
@@ -332,61 +443,106 @@ function slotOf(hour) {
     return '오전';
 }
 
-function basicCurate({ weather, day, mood }, avoid) {
+// AI 없이: 태그가 많이 겹치는 순서로 n편
+function basicPool({ weather, day, mood }, avoid, n) {
     const want = [...MOODS[mood].tags, weather];
-    const ranked = BASIC_MOVIES
+    const ranked = BASIC_WORKS
         .filter(m => !avoid.has(m.title))
         .map(m => ({ m, hit: m.tags.filter(t => want.includes(t)), r: Math.random() }))
-        .sort((a, b) => b.hit.length - a.hit.length || a.r - b.r);
-    const [a, b, c] = ranked;
+        .sort((a, b) => b.hit.length - a.hit.length || a.r - b.r)
+        .slice(0, n);
     const tagText = x => x.hit.filter(t => !WEATHERS[t]).map(t => '#' + t).join(' ') || '#' + MOODS[mood].tags[0];
     return {
-        analysis: `${WEATHERS[weather]}, ${day}요일, '${MOODS[mood].hint}' 상태라서 ${MOODS[mood].tags.map(t => '#' + t).join(' ')} 느낌의 영화를 찾았어요.`,
-        main: {
-            ...a.m,
-            hook: `${a.m.director} 감독의 ${a.m.genres.join('·')} 영화예요.`,
+        analysis: `${WEATHERS[weather]}, ${day}요일, '${MOODS[mood].hint}' 상태라서 ${MOODS[mood].tags.map(t => '#' + t).join(' ')} 느낌의 작품을 찾았어요.`,
+        picks: ranked.map(x => ({
+            ...x.m,
+            hook: `${x.m.director} ${makerWord(x.m)}의 ${x.m.genres.join('·')} ${kindWord(x.m)}예요.`,
             reasons: [
-                `지금 기분에 필요한 분위기(${tagText(a)})를 가진 작품이에요.`,
-                a.m.tags.includes(weather) ? `${WEATHERS[weather]}과 특히 잘 어울리는 작품이에요.` : `${day}요일에 부담 없이 보기 좋아요.`,
-                '고민은 여기까지! 이 영화로 시작하면 후회 없을 거예요.',
+                `지금 기분에 필요한 분위기(${tagText(x)})를 가진 작품이에요.`,
+                x.m.tags.includes(weather) ? `${WEATHERS[weather]}과 특히 잘 어울리는 작품이에요.` : `${day}요일에 부담 없이 보기 좋아요.`,
+                '고민은 여기까지! 이 작품으로 시작하면 후회 없을 거예요.',
             ],
-        },
-        alternatives: [b, c].filter(Boolean).map(x => ({ ...x.m, reason: `비슷한 분위기(${tagText(x)})로 골랐어요.` })),
+            reason: `비슷한 분위기(${tagText(x)})로 골랐어요.`,
+        })),
     };
 }
 
-async function curate(input) {
+function curatePrompt(input, avoid, ott) {
     const { weather, day, mood, hour } = input;
-    const avoid = new Set(input.avoid);
-    if (apiKey()) {
-        try {
-            const r = await askGemini(SYSTEM, `지금 상황을 분석해서 딱 맞는 영화를 추천해 줘.
+    return `지금 상황을 분석해서 딱 맞는 작품(영화 또는 시리즈)을 추천해 줘.
 - 날씨: ${WEATHERS[weather]}
 - 요일: ${day}요일
 - 시간대: ${slotOf(hour)}
 - 기분: ${MOODS[mood].hint}
-메인 추천 1편과, 메인이 마음에 안 들 때를 위한 대안 2편을 골라 줘. 세 편은 서로 달라야 해.
-${avoid.size ? `방금 추천한 영화는 빼 줘: ${[...avoid].join(', ')}` : ''}
-${input.catalog.length ? `우리 사이트에서 바로 볼 수 있는 영화 목록이야. 상황에 잘 맞는다면 이 중에서 우선 골라 줘: ${input.catalog.join(', ')}` : ''}`, CURATE_SCHEMA);
-            return { source: 'gemini', ...r };
+${ott
+        ? `사용자는 ${OTT_LIST[ott].name}만 구독하고 있어. 한국 ${OTT_LIST[ott].name}에서 볼 수 있는 작품으로, 상황에 잘 맞는 순서대로 ${POOL_SIZE}편을 골라 줘. 모두 서로 달라야 해.`
+        : '메인 추천 1편과, 메인이 마음에 안 들 때를 위한 대안 2편을 골라 줘. 세 편은 서로 달라야 해.'}
+${avoid.size ? `방금 추천한 작품은 빼 줘: ${[...avoid].join(', ')}` : ''}
+${!ott && input.catalog.length ? `우리 사이트에서 바로 볼 수 있는 작품 목록이야. 상황에 잘 맞는다면 이 중에서 우선 골라 줘: ${input.catalog.join(', ')}` : ''}`;
+}
+
+async function curate(input) {
+    const avoid = new Set(input.avoid);
+    const ott = input.ott;
+    let pool = null, source = 'basic', notice = '';
+
+    if (apiKey()) {
+        try {
+            if (ott) {
+                pool = await askGemini(SYSTEM_WORKS, curatePrompt(input, avoid, ott), CURATE_POOL_SCHEMA);
+            } else {
+                const r = await askGemini(SYSTEM_WORKS, curatePrompt(input, avoid, ''), CURATE_SCHEMA);
+                pool = { analysis: r.analysis, picks: [r.main, ...(r.alternatives || [])] };
+            }
+            if (!Array.isArray(pool?.picks) || !pool.picks.length) throw new Error('추천 결과가 비어 있어요.');
+            source = 'gemini';
         } catch (e) {
             console.error('[승우 AI] 큐레이션 실패:', e.status || '', e.message);
-            return { source: 'basic', notice: errorMessage(e), ...basicCurate(input, avoid) };
+            notice = errorMessage(e);
+            pool = null;
         }
     }
-    return { source: 'basic', ...basicCurate(input, avoid) };
+    if (!pool) pool = basicPool(input, avoid, ott ? 10 : 3);
+
+    // 같은 제목 두 번 나오는 것 빼고, TMDB 정보 붙이기
+    const seen = new Set();
+    if (!pool.picks.some(p => p && p.title && !avoid.has(p.title))) pool = basicPool(input, avoid, ott ? 10 : 3);
+    const picks = pool.picks.filter(p => p && p.title && !avoid.has(p.title) && !seen.has(p.title) && seen.add(p.title))
+        .map(p => ({ ...p, type: p.type === 'tv' ? 'tv' : 'movie', reasons: Array.isArray(p.reasons) ? p.reasons : [], reason: p.reason || (p.reasons || [])[0] || '' }));
+    const enriched = await Promise.all(picks.map(enrich));
+
+    const isOn = m => m.providers?.list.some(p => p.id === ott);
+    let chosen = enriched.slice(0, 3), ottNotice = '';
+    if (ott) {
+        const name = OTT_LIST[ott].name;
+        const onOtt = enriched.filter(isOn);
+        // AI 후보 중 그 OTT 에 있는 게 3편이 안 되면, 기본 목록에서 분위기 맞는 작품으로 채우기
+        if (onOtt.length < 3 && enriched.some(m => m.checked)) {
+            const skip = new Set([...avoid, ...enriched.map(m => m.title)]);
+            const extra = await Promise.all(basicPool(input, skip, 12).picks.map(enrich));
+            onOtt.push(...extra.filter(isOn).slice(0, 3 - onOtt.length));
+        }
+        if (!enriched.some(m => m.checked)) {
+            ottNotice = `TMDB 연결이 안 돼서 ${name}에 있는지 확인하지 못했어요. OTT 상관없이 추천해 드려요.`;
+        } else if (!onOtt.length) {
+            ottNotice = `지금 ${name}에서 볼 수 있는 작품을 찾지 못했어요. 대신 다른 OTT에 있는 작품을 추천해 드려요.`;
+            chosen = [...enriched.filter(m => m.checked), ...enriched.filter(m => !m.checked)].slice(0, 3);   // 확인된 작품 먼저
+        } else {
+            chosen = onOtt.slice(0, 3);
+            if (chosen.length < 3) ottNotice = `${name}에서 볼 수 있는 작품이 ${chosen.length}편만 확인됐어요.`;
+        }
+    }
+    const [main, ...alternatives] = chosen;
+    return { source, notice, ottNotice, ott, analysis: pool.analysis, main, alternatives };
 }
 
 // 화면에 보내기 전에 값 정리 (이상한 값·너무 긴 글 막기)
 function cleanCurate(r) {
-    const movie = m => ({
-        title: text(m?.title, 80), originalTitle: text(m?.originalTitle, 120), year: Number(m?.year) || null,
-        director: text(m?.director, 60), genres: (Array.isArray(m?.genres) ? m.genres : []).slice(0, 3).map(g => text(g, 20)),
-    });
     return {
-        source: r.source, notice: r.notice || '', analysis: text(r.analysis, 400),
-        main: { ...movie(r.main), hook: text(r.main?.hook), reasons: (r.main?.reasons || []).slice(0, 3).map(x => text(x)) },
-        alternatives: (r.alternatives || []).slice(0, 2).map(a => ({ ...movie(a), reason: text(a.reason) })),
+        source: r.source, notice: r.notice || '', ottNotice: r.ottNotice || '', ott: r.ott || '',
+        analysis: text(r.analysis, 400),
+        main: { ...cleanWork(r.main), hook: text(r.main?.hook), reasons: (r.main?.reasons || []).slice(0, 3).map(x => text(x)) },
+        alternatives: (r.alternatives || []).slice(0, 2).map(a => ({ ...cleanWork(a), reason: text(a.reason) })),
     };
 }
 
@@ -786,6 +942,7 @@ module.exports = function registerSeungwooApi(app) {
             weather: b.weather, mood: b.mood, day: b.day,
             hour: Number.isInteger(b.hour) && b.hour >= 0 && b.hour < 24 ? b.hour : new Date().getHours(),
             avoid: (Array.isArray(b.avoid) ? b.avoid : []).slice(0, 12).map(t => text(t, 80)),
+            ott: OTT_LIST[b.ott] ? b.ott : '',
             catalog: (Array.isArray(b.catalog) ? b.catalog : []).slice(0, 80).map(t => text(t, 80)),
         };
         res.json(cleanCurate(await curate(input)));

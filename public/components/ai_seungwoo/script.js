@@ -2,7 +2,8 @@
 // AI 호출은 서버(api_seungwoo.js)가 하고, 여기서는 결과를 받아 화면에 그리기만 합니다.
 //   - 오늘의 AI 픽:      GET  /api/seungwoo/today
 //   - 상황별 큐레이션:   POST /api/seungwoo/curate
-// 포스터는 TMDB 검색(/api/tmdb/search)으로, OTT 정보는 종원 검색 데이터로 찾아 붙입니다.
+// 영화와 OTT 시리즈를 함께 추천합니다. 포스터·시즌 수·볼 수 있는 OTT 는 서버가 TMDB 에서 찾아 붙여 줍니다.
+// (TMDB 키가 없으면 OTT 배지는 종원 검색 데이터로 대신 찾아 붙입니다.)
 import { PLATFORMS, CONTENTS as SAMPLE } from '../search_jongwon/data.js';
 
 const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -20,10 +21,12 @@ const OPTIONS = {
         { value: '심심', label: '🥱 심심해요' }, { value: '스트레스', label: '🤯 스트레스 폭발' },
         { value: '생각', label: '🤔 생각에 잠기고 싶어요' },
     ],
+    // 구독 중인 OTT (고르면 그 OTT 에서 볼 수 있는 작품만)
+    ott: [{ value: '', label: '상관없어요' }, ...PLATFORMS.map(p => ({ value: p.id, label: p.name }))],
 };
 
 const now = new Date();
-const state = { weather: null, day: DAYS[now.getDay()], mood: null };   // 요일은 오늘로 미리 선택
+const state = { weather: null, day: DAYS[now.getDay()], mood: null, ott: '' };   // 요일은 오늘, OTT 는 상관없음으로 미리 선택
 let shown = [];          // 큐레이션에서 이미 보여준 제목 (다시 받기 때 겹치지 않게)
 let catalog = SAMPLE;    // 우리 사이트 작품 목록 (OTT 배지용)
 let busy = false;
@@ -35,37 +38,51 @@ function esc(v) {
     return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ── 포스터 & OTT 정보 찾기
-async function findPoster(movie) {
-    for (const q of [movie.title, movie.originalTitle].filter(Boolean)) {
-        try {
-            const res = await fetch(`/api/tmdb/search?query=${encodeURIComponent(q)}`);
-            if (!res.ok) return null;                    // TMDB 키가 없으면 포스터 없이
-            const { results = [] } = await res.json();
-            const hit = results.find(r => movie.year && Math.abs(Number(r.year) - movie.year) <= 1) || results[0];
-            if (hit?.poster) return hit.poster;
-        } catch (e) { return null; }
-    }
-    return null;
-}
+// ── 포스터 & OTT 표시
+const platformOf = id => PLATFORMS.find(p => p.id === id);
 
+// TMDB 키가 없을 때만: 종원 검색 데이터에 같은 제목이 있으면 그 OTT
 function ottOf(movie) {
     const hit = catalog.find(c => c.title === movie.title);
-    return hit ? PLATFORMS.find(p => p.id === hit.platform) : null;
+    return hit ? platformOf(hit.platform) : null;
 }
 
-function posterHtml(movie, poster, size = '') {
-    return poster
-        ? `<img class="sw-poster ${size}" src="${esc(poster)}" alt="${esc(movie.title)} 포스터">`
+function posterHtml(movie, size = '') {
+    return movie.poster
+        ? `<img class="sw-poster ${size}" src="${esc(movie.poster)}" alt="${esc(movie.title)} 포스터">`
         : `<div class="sw-poster sw-poster-empty ${size}" aria-hidden="true"><span>${esc(movie.title[0] || '?')}</span></div>`;
 }
 
-function metaHtml(m) {
-    const parts = [m.year && `${m.year}`, m.director && `감독 ${m.director}`, ...(m.genres || [])].filter(Boolean);
-    return `<p class="sw-meta">${parts.map(esc).join(' · ')}</p>`;
+function typeHtml(m) {
+    return `<span class="sw-type sw-type-${m.type === 'tv' ? 'tv' : 'movie'}">${m.type === 'tv' ? '시리즈' : '영화'}</span>`;
 }
 
-function ottHtml(m) {
+function metaHtml(m) {
+    const isTv = m.type === 'tv';
+    const parts = [
+        m.year && `${m.year}`,
+        isTv && m.seasons && `시즌 ${m.seasons}개`,
+        m.director && `${isTv ? '연출' : '감독'} ${m.director}`,
+        ...(m.genres || []),
+    ].filter(Boolean);
+    return `<p class="sw-meta">${typeHtml(m)}${parts.map(esc).join(' · ')}</p>`;
+}
+
+// 볼 수 있는 OTT (TMDB → JustWatch 정보). 우리 사이트 OTT(넷플릭스 등)는 한국어 이름과 색으로
+function ottHtml(m, small = false) {
+    const list = m.providers?.list || [];
+    if (list.length) {
+        const shown = list.slice(0, small ? 3 : 5);
+        return `<div class="sw-otts${small ? ' is-small' : ''}">
+            <span class="sw-otts-label">볼 수 있는 곳</span>
+            ${shown.map(o => {
+                const p = platformOf(o.id);
+                return p
+                    ? `<span class="sw-ott" style="--ott:${p.color}">${esc(p.name)}</span>`
+                    : `<span class="sw-ott sw-ott-etc">${o.logo ? `<img src="${esc(o.logo)}" alt="" loading="lazy">` : ''}${esc(o.name)}</span>`;
+            }).join('')}
+        </div>`;
+    }
     const p = ottOf(m);
     return p ? `<span class="sw-ott" style="--ott:${p.color}">${esc(p.name)}에서 바로 보기</span>` : '';
 }
@@ -78,19 +95,18 @@ async function loadToday() {
         const res = await fetch(`/api/seungwoo/today?date=${date}`);
         const data = await res.json();
         const m = data.movie;
-        const poster = await findPoster(m);
         if (!$('sw-today')) return;            // 그사이 다른 페이지로 갔으면 중단
 
         $('sw-today-date').textContent = `${data.label} · 하루에 한 편, 매일 바뀌어요`;
         $('sw-today').innerHTML = `
-            <div class="sw-today-poster">${posterHtml(m, poster, 'is-large')}</div>
+            <div class="sw-today-poster">${posterHtml(m, 'is-large')}</div>
             <div class="sw-today-body">
                 <p class="sw-theme">오늘의 테마 <strong>${esc(data.theme.name)}</strong></p>
                 <h3 class="sw-title">${esc(m.title)}${m.originalTitle && m.originalTitle !== m.title ? `<small>${esc(m.originalTitle)}</small>` : ''}</h3>
                 ${metaHtml(m)}
                 <p class="sw-hook">${esc(m.hook)}</p>
                 <dl class="sw-why">
-                    <div><dt>왜 오늘 이 영화?</dt><dd>${esc(m.whyToday)}</dd></div>
+                    <div><dt>왜 오늘 이 ${m.type === 'tv' ? '시리즈' : '영화'}?</dt><dd>${esc(m.whyToday)}</dd></div>
                     <div><dt>관전 포인트</dt><dd>${esc(m.watchPoint)}</dd></div>
                     <div><dt>이런 분께 추천해요</dt><dd>${esc(m.forWhom)}</dd></div>
                 </dl>
@@ -128,7 +144,7 @@ async function curate(again = false) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 ...state, hour: new Date().getHours(), avoid: shown,
-                catalog: catalog.filter(c => c.type === '영화').map(c => c.title),
+                catalog: catalog.map(c => c.title),
             }),
         });
         const data = await res.json();
@@ -136,9 +152,8 @@ async function curate(again = false) {
 
         const all = [data.main, ...data.alternatives];
         shown.push(...all.map(m => m.title));
-        const posters = await Promise.all(all.map(findPoster));
         if (!$('sw-result')) return;
-        renderResult(data, posters);
+        renderResult(data);
     } catch (e) {
         if ($('sw-result')) $('sw-result').innerHTML = `<div class="sw-loading">추천을 받지 못했어요. ${esc(e.message || '')}</div>`;
     } finally {
@@ -147,16 +162,17 @@ async function curate(again = false) {
     }
 }
 
-function renderResult(data, posters) {
+function renderResult(data) {
     const m = data.main;
     $('sw-result').innerHTML = `
         <p class="sw-analysis"><span>AI 분석</span>${esc(data.analysis)}</p>
         ${data.notice ? `<p class="sw-notice">${esc(data.notice)} 지금은 기본 추천을 보여드려요.</p>` : ''}
+        ${data.ottNotice ? `<p class="sw-notice">${esc(data.ottNotice)}</p>` : ''}
 
         <article class="sw-main">
-            ${posterHtml(m, posters[0])}
+            ${posterHtml(m)}
             <div class="sw-main-body">
-                <p class="sw-badge">지금 상황에 찰떡인 영화</p>
+                <p class="sw-badge">지금 상황에 찰떡인 ${m.type === 'tv' ? '시리즈' : '영화'}</p>
                 <h3 class="sw-title">${esc(m.title)}${m.originalTitle && m.originalTitle !== m.title ? `<small>${esc(m.originalTitle)}</small>` : ''}</h3>
                 ${metaHtml(m)}
                 <p class="sw-hook">${esc(m.hook)}</p>
@@ -165,20 +181,22 @@ function renderResult(data, posters) {
             </div>
         </article>
 
+        ${data.alternatives.length ? `
         <h4 class="sw-alt-title">이게 별로라면, 이것도 있어요</h4>
         <div class="sw-alts">
-            ${data.alternatives.map((a, i) => `
+            ${data.alternatives.map(a => `
                 <article class="sw-alt">
-                    ${posterHtml(a, posters[i + 1], 'is-small')}
+                    ${posterHtml(a, 'is-small')}
                     <div>
-                        <h5>${esc(a.title)} <span>${esc(a.year || '')}</span></h5>
+                        <p class="sw-alt-type">${typeHtml(a)}</p>
+                        <h5>${esc(a.title)} <span>${esc([a.year, a.type === 'tv' && a.seasons ? `시즌 ${a.seasons}개` : ''].filter(Boolean).join(' · '))}</span></h5>
                         <p>${esc(a.reason)}</p>
-                        ${ottHtml(a)}
+                        ${ottHtml(a, true)}
                     </div>
                 </article>`).join('')}
-        </div>
+        </div>` : ''}
 
-        <button type="button" class="sw-again" id="sw-again">다른 영화로 다시 추천받기</button>`;
+        <button type="button" class="sw-again" id="sw-again">다른 작품으로 다시 추천받기</button>`;
 }
 
 // ── 클릭 연결 (페이지에 올 때마다 새로 그려지니까 각 요소에 직접 연결)
@@ -209,7 +227,7 @@ loadToday();
     try {
         const s = await (await fetch('/api/seungwoo/status')).json();
         if ($('sw-foot')) $('sw-foot').textContent = s.ai
-            ? `Google Gemini(${s.model})가 추천하고 있어요. AI 추천은 가끔 틀릴 수 있어요.`
-            : 'GEMINI_API_KEY가 없어서 기본(규칙 기반) 추천으로 동작하고 있어요.';
+            ? `Google Gemini(${s.model})가 추천하고 있어요. AI 추천은 가끔 틀릴 수 있어요. 볼 수 있는 OTT 정보는 JustWatch 제공(TMDB)이에요.`
+            : 'GEMINI_API_KEY가 없어서 기본(규칙 기반) 추천으로 동작하고 있어요. 볼 수 있는 OTT 정보는 JustWatch 제공(TMDB)이에요.';
     } catch (e) { /* 무시 */ }
 })();

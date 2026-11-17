@@ -90,3 +90,18 @@
     .sw-today-poster, .sw-main > .sw-poster { max-width: 200px; }
     .sw-picker { padding: 18px; }
 }
+
+/* 영화 / 시리즈 표시, 볼 수 있는 OTT */
+.sw-type { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; color: #fff; vertical-align: 1px; }
+.sw-type-movie { background: #2563eb; }
+.sw-type-tv { background: #7c5cff; }
+.sw-alt-type { margin: 0 0 2px; }
+.sw-step-title small { margin-left: 6px; color: var(--sw-muted); font-size: 0.8rem; font-weight: 500; }
+.sw-otts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 16px; }
+.sw-otts .sw-ott { margin-top: 0; }
+.sw-otts-label { color: var(--sw-muted); font-size: 0.82rem; font-weight: 700; margin-right: 2px; }
+.sw-ott-etc { display: inline-flex; align-items: center; gap: 5px; background: #2a2e38; }
+.sw-ott-etc img { width: 16px; height: 16px; border-radius: 4px; }
+.sw-otts.is-small { margin-top: 8px; gap: 4px; }
+.sw-otts.is-small .sw-otts-label { font-size: 0.72rem; }
+.sw-otts.is-small .sw-ott { padding: 3px 8px; font-size: 0.75rem; }
