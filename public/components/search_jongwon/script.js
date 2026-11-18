@@ -142,21 +142,38 @@ async function searchServer(platforms) {
     return (await res.json()).platforms || {};
 }
 
+// ── 카드를 눌렀을 때 갈 곳
+//    영화: 규빈 님의 작품 정보 페이지 (/community.html?movie=TMDB번호)
+//    시리즈: 작품 정보 페이지가 아직 영화만 지원해서, TMDB 사이트의 작품 페이지를 새 탭으로 엶
+//    샘플 데이터(TMDB 번호 없음): 갈 곳이 없어서 누를 수 없음
+function linkOf(item) {
+    const id = Number(item.tmdbId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+    if (item.type === '영화') return { href: `/community.html?movie=${id}`, external: false };
+    return { href: `https://www.themoviedb.org/tv/${id}`, external: true };
+}
+
 // ── 화면 그리기: 카드 한 장
 function cardHtml(item, i, p, picked) {
     const tags = [...item.genres, ...item.moods];
+    const link = linkOf(item);
+    const tag = link ? 'a' : 'article';
+    const linkAttrs = !link ? ''
+        : link.external
+            ? ` href="${esc(link.href)}" target="_blank" rel="noopener noreferrer" title="TMDB에서 작품 정보 보기 (새 탭)"`
+            : ` href="${esc(link.href)}" title="작품 정보 보기"`;
     return `
-        <article class="sj-card ${item.poster ? 'has-poster' : ''} ${item.similar ? 'similar' : ''}" style="--sj-color:${p.color}">
+        <${tag} class="sj-card ${item.poster ? 'has-poster' : ''} ${item.similar ? 'similar' : ''} ${link ? 'is-link' : ''}" style="--sj-color:${p.color}"${linkAttrs}>
             ${item.poster ? `<img class="sj-card-poster" src="${esc(item.poster)}" alt="${esc(item.title)} 포스터" loading="lazy">` : ''}
             <div class="sj-card-rank">${i + 1}</div>
             ${item.similar ? '<div class="sj-card-similar">비슷한 작품</div>' : ''}
-            <div class="sj-card-title">${esc(item.title)}</div>
+            <div class="sj-card-title">${esc(item.title)}${link && link.external ? ' <span class="sj-card-ext" aria-hidden="true">↗</span>' : ''}</div>
             <div class="sj-card-meta">${[item.year, item.type, item.country[0]].filter(Boolean).map(esc).join(' · ')}</div>
             <div class="sj-card-line">${esc(item.line) || '줄거리 정보가 아직 없어요.'}</div>
             <div class="sj-card-tags">
                 ${tags.map(t => `<span class="${picked.includes(t) ? 'hit' : ''}">#${esc(t)}</span>`).join('')}
             </div>
-        </article>`;
+        </${tag}>`;
 }
 
 // ── 화면 그리기: 결과 전체
