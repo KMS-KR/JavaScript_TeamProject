@@ -21,6 +21,9 @@ async function loadView() {
         if (viewName === 'ai') {
             loadComponent('zone-ai', 'ai_seungwoo');
         }
+        if (viewName === 'spoiler') {
+            loadComponent('zone-spoiler', 'spoiler_seungwoo');
+        }
     } catch (error) {
         appRoot.innerHTML = '<div style="padding: 100px 4%; text-align:center;"><h2>페이지 준비 중입니다.</h2></div>';
     }
