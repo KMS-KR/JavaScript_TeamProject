@@ -475,6 +475,37 @@
 .oc-root .oc-review-body{white-space:pre-wrap}
 body.oc-community-page>.navbar .nav-left{flex-wrap:wrap}
 body.oc-community-page>.navbar .nav-links{flex-wrap:wrap;gap:18px}
+body.oc-selecting-movie .oc-shell>.oc-section-nav,
+body.oc-selecting-movie .oc-shell>.oc-detail-card,
+body.oc-selecting-movie .oc-shell>.oc-detail-layout,
+body.oc-selecting-movie .oc-shell>.oc-footer,
+body.oc-selecting-movie .oc-shell>.oc-attribution{display:none!important}
+@media(min-width:768px){
+  .oc-shell:has(> .oc-detail-card){
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 240px;
+    grid-template-areas:
+      "heading heading"
+      "section-nav section-nav"
+      "detail aside"
+      "reviews aside"
+      "footer footer"
+      "attribution attribution";
+    align-items:start;
+    gap:16px;
+  }
+  .oc-shell:has(> .oc-detail-card)>.oc-page-heading{grid-area:heading;margin-bottom:0;}
+  .oc-shell:has(> .oc-detail-card)>.oc-section-nav{grid-area:section-nav;margin-bottom:0;}
+  .oc-shell:has(> .oc-detail-card)>.oc-detail-card{grid-area:detail;}
+  .oc-shell:has(> .oc-detail-card)>.oc-detail-layout{display:contents;margin:0;}
+  .oc-shell:has(> .oc-detail-card) .oc-reviews-slot{grid-area:reviews;}
+  .oc-shell:has(> .oc-detail-card) .oc-detail-aside{grid-area:aside;align-self:stretch;}
+  .oc-shell:has(> .oc-detail-card)>.oc-footer{grid-area:footer;}
+  .oc-shell:has(> .oc-detail-card)>.oc-attribution{grid-area:attribution;}
+}
+@media(min-width:1001px){
+  .oc-shell:has(> .oc-detail-card){grid-template-columns:minmax(0,1fr) 280px;gap:20px;}
+}
 @media(max-width:900px){.oc-summary-grid{grid-template-columns:1fr}.oc-spoiler-warning{flex-wrap:wrap}.oc-spoiler-warning>.oc-button{margin-left:68px}.oc-summary-card{padding:18px}.oc-blur-wrap{min-height:100px}}
 @media(max-width:600px){.oc-consent-box{align-items:stretch;flex-direction:column}.oc-spoiler-warning{padding:18px;gap:12px}.oc-spoiler-warning h1{font-size:20px}.oc-spoiler-warning>.oc-button{margin-left:0;width:100%}.oc-summary-panel{padding:18px}.oc-page-heading{align-items:flex-start}.oc-page-heading>.oc-button{font-size:11px;padding:8px}.oc-root .oc-page-heading h2{font-size:21px}.oc-root .oc-section-nav a{font-size:13px}.oc-spoiler-subnav{gap:7px}.oc-root .oc-spoiler-subnav a{padding:7px 9px;font-size:11px}.oc-root .oc-form-bottom{align-items:flex-start;flex-wrap:wrap;gap:12px}body.oc-community-page>.navbar .nav-links{gap:12px}.oc-root #spoiler-summary,.oc-root #spoiler-reviews,.oc-root #external-reviews{scroll-margin-top:200px}}
 @media(prefers-reduced-motion:reduce){.oc-root *{scroll-behavior:auto!important;transition:none!important}}

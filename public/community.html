@@ -42,6 +42,7 @@
           <li><a href="/#search">통합 검색</a></li>
           <li><a href="/community.html" id="oc-nav-detail" aria-current="page">작품 정보</a></li>
           <li><a href="/spoilers.html" id="oc-nav-spoilers">스포일러</a></li>
+          <li><a href="/#ai">AI 추천</a></li>
         </ul>
       </div>
       <div class="nav-right">
@@ -60,6 +61,37 @@
         event.preventDefault();
         window.dispatchEvent(new CustomEvent('ottpia:movie-search',{detail:document.getElementById('oc-global-query').value.trim()}));
       });
+      (function(){
+        var root=document.getElementById('root');
+        var pickerAutoOpened=false;
+        function hasMovieId(){
+          var searchMovie=new URLSearchParams(window.location.search).get('movie');
+          var hashMovie=new URLSearchParams(window.location.hash.slice(1)).get('movie');
+          return Boolean((searchMovie&&searchMovie.trim())||(hashMovie&&hashMovie.trim()));
+        }
+        function syncMovieSelection(){
+          if(hasMovieId()){
+            document.body.classList.remove('oc-selecting-movie');
+            return;
+          }
+          document.body.classList.add('oc-selecting-movie');
+          if(pickerAutoOpened||root.querySelector('dialog[open]'))return;
+          var openButton=root.querySelector('.oc-page-heading > button');
+          if(openButton){
+            pickerAutoOpened=true;
+            openButton.click();
+          }
+        }
+        function handleHistoryChange(){
+          if(!hasMovieId())pickerAutoOpened=false;
+          syncMovieSelection();
+        }
+        var observer=new MutationObserver(syncMovieSelection);
+        observer.observe(root,{childList:true,subtree:true});
+        window.addEventListener('popstate',handleHistoryChange);
+        window.addEventListener('hashchange',handleHistoryChange);
+        syncMovieSelection();
+      })();
     </script>
       <script type="module" src="/js/community.js"></script>
   </body>
