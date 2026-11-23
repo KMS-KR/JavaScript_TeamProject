@@ -57,6 +57,26 @@
     <div id="root"></div>
     <noscript><p style="color:white;padding:24px">작품 정보와 스포일러 페이지를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
     <script>
+      (function(){
+        var params=new URLSearchParams(window.location.search);
+        if(params.get('tab')!=='spoiler')return;
+        var target=new URL('/',window.location.origin);
+        var movieId=params.get('movie');
+        if(movieId&&/^[1-9]\d{0,9}$/.test(movieId))target.searchParams.set('movie',movieId);
+        target.hash='spoiler';
+        window.location.replace(target.href);
+      })();
+      document.getElementById('root').addEventListener('click',function(event){
+        var link=event.target.closest('a[href^="/spoilers.html"]');
+        if(!link)return;
+        event.preventDefault();
+        var source=new URL(link.href,window.location.origin);
+        var movieId=source.searchParams.get('movie')||new URLSearchParams(window.location.search).get('movie');
+        var target=new URL('/',window.location.origin);
+        if(movieId&&/^[1-9]\d{0,9}$/.test(movieId))target.searchParams.set('movie',movieId);
+        target.hash='spoiler';
+        window.location.assign(target.href);
+      });
       document.getElementById('oc-site-search').addEventListener('submit',function(event){
         event.preventDefault();
         window.dispatchEvent(new CustomEvent('ottpia:movie-search',{detail:document.getElementById('oc-global-query').value.trim()}));

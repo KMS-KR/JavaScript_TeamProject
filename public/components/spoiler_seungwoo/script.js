@@ -85,7 +85,7 @@ async function openSpoiler(picked, extraNotice = '') {
         if (!res.ok) throw new Error(data.message);
 
         // 검색 결과에 있던 포스터·연도를 우선 사용
-        const movie = { ...data.movie, poster: picked.poster || data.movie.poster, year: picked.year || data.movie.year };
+        const movie = { ...data.movie, tmdbId: picked.tmdbId || null, poster: picked.poster || data.movie.poster, year: picked.year || data.movie.year };
         renderCard(movie, data, [extraNotice, data.notice].filter(Boolean).join(' '));
     } catch (e) {
         if (no === requestNo && $('sp-card')) {
@@ -152,6 +152,7 @@ function renderCard(movie, data, notice) {
                 <h2 class="sp-title">${esc(movie.title)}${sub ? `<small>${esc(sub)}</small>` : ''}</h2>
                 ${movie.overview ? `<p class="sp-overview"><span>스포일러 없는 소개</span>${esc(movie.overview)}</p>` : ''}
                 ${providersHtml(data.providers)}
+                ${movie.type === 'movie' && movie.tmdbId ? `<a class="sp-detail-link" href="/community.html?movie=${encodeURIComponent(movie.tmdbId)}">작품 정보로 돌아가기</a>` : ''}
             </div>
         </div>
 
@@ -213,3 +214,9 @@ $('sp-examples').querySelectorAll('.sp-example').forEach(btn => {
     btn.addEventListener('click', () => { $('sp-query').value = btn.textContent; search(btn.textContent); });
 });
 $('sp-search').addEventListener('submit', e => { e.preventDefault(); search($('sp-query').value); });
+
+const linkedMovieId = new URLSearchParams(location.search).get('movie');
+if (linkedMovieId && /^[1-9]\d{0,9}$/.test(linkedMovieId)) {
+    $('sp-query').value = '';
+    openSpoiler({ tmdbId: linkedMovieId, type: 'movie', title: '선택한 작품' });
+}
