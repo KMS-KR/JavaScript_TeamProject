@@ -57,6 +57,7 @@
 .sp-title small { display: block; margin-top: 4px; font-size: 0.95rem; font-weight: 500; color: var(--sp-muted); }
 .sp-overview { margin: 14px 0 0; color: #cfd3dc; line-height: 1.7; font-size: 0.95rem; }
 .sp-overview span { display: inline-block; margin-right: 8px; padding: 2px 8px; border-radius: 5px; background: #23324a; color: #9ec3ff; font-size: 0.75rem; font-weight: 700; vertical-align: 1px; }
+.sp-detail-link { display: inline-block; margin-top: 14px; color: #9ec3ff; font-size: 0.88rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
 /* 볼 수 있는 OTT */
 .sp-ott { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; }

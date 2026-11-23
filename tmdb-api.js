@@ -55,6 +55,7 @@ function movieRecord(raw, details = false, overviewLanguage = 'ko-KR') {
     tmdbRating: Number.isFinite(raw.vote_average) ? raw.vote_average : null,
     tmdbVoteCount: Number.isFinite(raw.vote_count) ? raw.vote_count : 0,
     tmdbUrl: `https://www.themoviedb.org/movie/${id}`,
+    wikidataId: /^Q[1-9]\d*$/.test(raw.external_ids?.wikidata_id || '') ? raw.external_ids.wikidata_id : null,
   };
 }
 
@@ -142,7 +143,7 @@ function createTmdbService({ token = '', apiKey = '', requestJSON = upstreamJSON
       return { results: (raw.results || []).filter((m) => !m.adult && Number.isSafeInteger(m.id) && m.id > 0).map((m) => movieRecord(m)), page: raw.page || page, totalPages: Math.min(500, raw.total_pages || 0), totalResults: raw.total_results || 0 };
     },
     async movie(id) {
-      let raw = await request(`/movie/${id}`, { language: 'ko-KR', append_to_response: 'credits' });
+      let raw = await request(`/movie/${id}`, { language: 'ko-KR', append_to_response: 'credits,external_ids' });
       if (raw.adult) throw new ApiError(404, 'MOVIE_NOT_FOUND', '표시할 수 없는 작품입니다.');
       let overviewLanguage = 'ko-KR';
       if (!raw.overview) {
@@ -152,6 +153,16 @@ function createTmdbService({ token = '', apiKey = '', requestJSON = upstreamJSON
         } catch { /* 번역 보완 실패는 한국어 상세 정보 표시를 막지 않습니다. */ }
       }
       return { movie: movieRecord(raw, true, overviewLanguage) };
+    },
+    async related(id, kind = 'similar') {
+      const endpoint = kind === 'similar' ? `/movie/${id}/similar` : '/movie/popular';
+      const raw = await request(endpoint, { language: 'ko-KR', page: 1 });
+      const seen = new Set([String(id)]);
+      const results = (raw.results || []).filter((m) => {
+        if (m.adult || !Number.isSafeInteger(m.id) || m.id <= 0 || seen.has(String(m.id))) return false;
+        seen.add(String(m.id)); return true;
+      }).slice(0, 10).map((m) => movieRecord(m));
+      return { movieId: String(id), kind, results };
     },
     async reviews(id, language, page = 1) {
       const raw = await request(`/movie/${id}/reviews`, { language, page });
@@ -207,6 +218,12 @@ function registerTmdbRoutes(app, { service } = {}) {
   }));
   app.get('/api/tmdb/movies/:id', route(async (req) => client.movie(positiveInteger(req.params.id, '영화 ID'))));
   app.get('/api/tmdb/movies/:id/reviews', route(async (req) => client.reviews(positiveInteger(req.params.id, '영화 ID'), reviewLanguage(req.query.language), pageNumber(req.query.page))));
+  app.get('/api/tmdb/movies/:id/related', route(async (req) => {
+    const id = positiveInteger(req.params.id, '영화 ID');
+    const kind = req.query.kind === undefined ? 'similar' : req.query.kind;
+    if (!['similar', 'other'].includes(kind)) throw new ApiError(400, 'INVALID_KIND', 'similar 또는 other만 지원합니다.');
+    return client.related(id, kind);
+  }));
   app.use('/api/tmdb', (req, res) => res.status(404).json({ error: { code: 'API_NOT_FOUND', message: '존재하지 않는 TMDB API 경로입니다.' } }));
   return client;
 }

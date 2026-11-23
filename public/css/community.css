@@ -427,3 +427,85 @@
  .oc-root .oc-attribution img {width:78px;}
  .oc-root .oc-local-label {font-size:10px;}
 }
+/* 새 스포일러 전용 레이아웃. 기존 상세 화면/팀 공통 CSS와 분리합니다. */
+.oc-section-nav{display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--oc-line);margin:0 0 24px}
+.oc-root .oc-section-nav a{display:flex;align-items:center;gap:8px;padding:0 0 14px;color:var(--oc-muted);border-bottom:3px solid transparent;font-weight:700}
+.oc-root .oc-section-nav a.is-active{color:#9dbfff;border-color:#669df6}
+.oc-root .oc-button-spoiler{background:#35283e;border-color:#735187;color:#f0d5ff}
+.oc-root .oc-button-spoiler:hover{background:#47334f}
+.oc-root .oc-review-help{margin-top:10px;line-height:1.8}
+.oc-root .oc-spoiler-entry{display:flex;align-items:center;gap:10px;padding:13px;margin-top:16px;background:#302639;border:1px solid #5a426b;border-radius:8px;color:#ecd4ff;font-size:12px}
+.oc-spoiler-entry span{flex:1}
+.oc-spoiler-page{display:flex;flex-direction:column;gap:20px}
+.oc-spoiler-warning{display:flex;align-items:center;gap:18px;padding:25px;background:linear-gradient(120deg,#282232,#1a1d23)}
+.oc-warning-icon{display:grid;place-items:center;width:50px;height:50px;border-radius:12px;background:#45324e;color:#ecd4ff;flex-shrink:0}
+.oc-root .oc-spoiler-warning .oc-eyebrow{color:#ddb7f5}
+.oc-spoiler-warning>div{flex:1;min-width:0}
+.oc-spoiler-warning h1{font-size:24px;line-height:1.4;letter-spacing:-.7px}
+.oc-spoiler-warning p:last-child{font-size:12px;color:#bcc0cd;margin-top:6px}
+.oc-spoiler-subnav{display:flex;gap:10px;flex-wrap:wrap}
+.oc-root .oc-spoiler-subnav a{border:1px solid #3d4250;border-radius:7px;padding:8px 13px;font-size:12px;background:#1a1d23;color:#c9cddd}
+.oc-summary-panel{padding:24px}
+.oc-consent-box{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #374253;border-radius:8px;padding:16px;margin-top:18px;background:#17212e}
+.oc-consent-box p{font-size:12px;color:#c0cadd;line-height:1.8}
+.oc-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:20px}
+.oc-summary-card{padding:20px 16px;border:1px solid #3d3548;border-radius:10px;background:#201d28;min-width:0}
+.oc-summary-number{font-size:11px;letter-spacing:2px;color:#c3a2dc}
+.oc-summary-card h3{font-size:17px;letter-spacing:-.4px;margin:5px 0 14px}
+.oc-spoiler-gate{margin-top:10px;min-width:0}
+.oc-blur-wrap{position:relative;display:grid;place-items:center;min-height:116px;overflow:hidden;background:#24232c;border-radius:8px;border:1px solid #47404f;padding:14px}
+.oc-blur-dummy{filter:blur(5px);user-select:none;pointer-events:none;color:#bdb2c7;font-size:14px;text-align:center;line-height:2}
+.oc-root .oc-reveal-button{position:absolute;white-space:normal;text-align:center;max-width:calc(100% - 22px);background:#342c40;border-color:#7e638e;color:#f4e7ff;min-height:42px}
+.oc-root .oc-rehide{margin-top:14px;color:#c7a9dc}
+.oc-summary-bullets{list-style:disc!important;padding-left:19px!important;color:#e7dff0;font-size:13px;line-height:1.9}
+.oc-summary-bullets li+li{margin-top:12px}
+.oc-summary-card .oc-muted{font-size:12px;line-height:1.9}
+.oc-evidence{font-size:11px;color:#c0b2cd;margin-top:8px}
+.oc-evidence summary{cursor:pointer}
+.oc-evidence blockquote{margin:8px 0 0;padding:9px 11px;border-left:2px solid #9675ab;color:#c8c1d0;white-space:pre-wrap}
+.oc-source-notice{border-top:1px solid #3c3546;padding-top:16px;margin-top:20px;color:#adb5c3;font-size:11px;line-height:1.9}
+.oc-source-notice p+p{margin-top:5px}
+.oc-root .oc-source-notice a{color:#a6c8ff;text-decoration:underline;text-underline-offset:3px}
+.oc-source-plot{white-space:pre-wrap;max-height:420px;overflow:auto;padding:14px;background:#13151c;border-radius:8px;line-height:1.9;color:#c9ceda}
+.oc-root .oc-tmdb-review-content{white-space:pre-wrap;max-height:420px;overflow:auto}
+.oc-root #spoiler-summary,.oc-root #spoiler-reviews,.oc-root #external-reviews{scroll-margin-top:160px}
+.oc-related h2{font-size:15px;line-height:1.5}
+.oc-related-tabs{margin:12px 0}
+.oc-root .oc-related-tabs button{font-size:11px}
+.oc-root .oc-review-body{white-space:pre-wrap}
+body.oc-community-page>.navbar .nav-left{flex-wrap:wrap}
+body.oc-community-page>.navbar .nav-links{flex-wrap:wrap;gap:18px}
+body.oc-selecting-movie .oc-shell>.oc-section-nav,
+body.oc-selecting-movie .oc-shell>.oc-detail-card,
+body.oc-selecting-movie .oc-shell>.oc-detail-layout,
+body.oc-selecting-movie .oc-shell>.oc-footer,
+body.oc-selecting-movie .oc-shell>.oc-attribution{display:none!important}
+@media(min-width:768px){
+  .oc-shell:has(> .oc-detail-card){
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 240px;
+    grid-template-areas:
+      "heading heading"
+      "section-nav section-nav"
+      "detail aside"
+      "reviews aside"
+      "footer footer"
+      "attribution attribution";
+    align-items:start;
+    gap:16px;
+  }
+  .oc-shell:has(> .oc-detail-card)>.oc-page-heading{grid-area:heading;margin-bottom:0;}
+  .oc-shell:has(> .oc-detail-card)>.oc-section-nav{grid-area:section-nav;margin-bottom:0;}
+  .oc-shell:has(> .oc-detail-card)>.oc-detail-card{grid-area:detail;}
+  .oc-shell:has(> .oc-detail-card)>.oc-detail-layout{display:contents;margin:0;}
+  .oc-shell:has(> .oc-detail-card) .oc-reviews-slot{grid-area:reviews;}
+  .oc-shell:has(> .oc-detail-card) .oc-detail-aside{grid-area:aside;align-self:stretch;}
+  .oc-shell:has(> .oc-detail-card)>.oc-footer{grid-area:footer;}
+  .oc-shell:has(> .oc-detail-card)>.oc-attribution{grid-area:attribution;}
+}
+@media(min-width:1001px){
+  .oc-shell:has(> .oc-detail-card){grid-template-columns:minmax(0,1fr) 280px;gap:20px;}
+}
+@media(max-width:900px){.oc-summary-grid{grid-template-columns:1fr}.oc-spoiler-warning{flex-wrap:wrap}.oc-spoiler-warning>.oc-button{margin-left:68px}.oc-summary-card{padding:18px}.oc-blur-wrap{min-height:100px}}
+@media(max-width:600px){.oc-consent-box{align-items:stretch;flex-direction:column}.oc-spoiler-warning{padding:18px;gap:12px}.oc-spoiler-warning h1{font-size:20px}.oc-spoiler-warning>.oc-button{margin-left:0;width:100%}.oc-summary-panel{padding:18px}.oc-page-heading{align-items:flex-start}.oc-page-heading>.oc-button{font-size:11px;padding:8px}.oc-root .oc-page-heading h2{font-size:21px}.oc-root .oc-section-nav a{font-size:13px}.oc-spoiler-subnav{gap:7px}.oc-root .oc-spoiler-subnav a{padding:7px 9px;font-size:11px}.oc-root .oc-form-bottom{align-items:flex-start;flex-wrap:wrap;gap:12px}body.oc-community-page>.navbar .nav-links{gap:12px}.oc-root #spoiler-summary,.oc-root #spoiler-reviews,.oc-root #external-reviews{scroll-margin-top:200px}}
+@media(prefers-reduced-motion:reduce){.oc-root *{scroll-behavior:auto!important;transition:none!important}}
