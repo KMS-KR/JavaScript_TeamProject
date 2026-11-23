@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f1115" />
-    <meta name="description" content="OTT피아 TMDB 작품 상세, 외부 리뷰, 10점 한줄평, 콘텐츠 톡" />
-    <title>OTT피아 — 작품 정보 & 커뮤니티</title>
+    <meta name="description" content="OTT피아 작품 정보와 한줄평, 선택해서 확인하는 스포일러" />
+    <title>OTT피아 — 작품 정보 · 스포일러</title>
     <!-- 공통 main.css보다 먼저 선언하는 기본값. 실제 팀 CSS는 최종 HTML에서 그대로 불러옵니다. -->
     <style>
       html{background:#0f1115;color-scheme:dark}body{margin:0;font-family:system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}#root{min-height:calc(100vh - 72px)}
@@ -40,8 +40,8 @@
         <ul class="nav-links">
           <li><a href="/#home">홈</a></li>
           <li><a href="/#search">통합 검색</a></li>
-          <li><a href="/community.html?tab=talk" aria-current="page">커뮤니티</a></li>
-          <li><a href="/#spoiler">스포일러</a></li>
+          <li><a href="/community.html" id="oc-nav-detail" aria-current="page">작품 정보</a></li>
+          <li><a href="/spoilers.html" id="oc-nav-spoilers">스포일러</a></li>
           <li><a href="/#ai">AI 추천</a></li>
         </ul>
       </div>
@@ -55,12 +55,63 @@
       </div>
     </nav>
     <div id="root"></div>
-    <noscript><p style="color:white;padding:24px">작품 정보와 커뮤니티를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
+    <noscript><p style="color:white;padding:24px">작품 정보와 스포일러 페이지를 사용하려면 JavaScript를 켜 주세요. 상단 메뉴로 홈/검색 페이지를 이용할 수 있어요.</p></noscript>
     <script>
+      (function(){
+        var params=new URLSearchParams(window.location.search);
+        if(params.get('tab')!=='spoiler')return;
+        var target=new URL('/',window.location.origin);
+        var movieId=params.get('movie');
+        if(movieId&&/^[1-9]\d{0,9}$/.test(movieId))target.searchParams.set('movie',movieId);
+        target.hash='spoiler';
+        window.location.replace(target.href);
+      })();
+      document.getElementById('root').addEventListener('click',function(event){
+        var link=event.target.closest('a[href^="/spoilers.html"]');
+        if(!link)return;
+        event.preventDefault();
+        var source=new URL(link.href,window.location.origin);
+        var movieId=source.searchParams.get('movie')||new URLSearchParams(window.location.search).get('movie');
+        var target=new URL('/',window.location.origin);
+        if(movieId&&/^[1-9]\d{0,9}$/.test(movieId))target.searchParams.set('movie',movieId);
+        target.hash='spoiler';
+        window.location.assign(target.href);
+      });
       document.getElementById('oc-site-search').addEventListener('submit',function(event){
         event.preventDefault();
         window.dispatchEvent(new CustomEvent('ottpia:movie-search',{detail:document.getElementById('oc-global-query').value.trim()}));
       });
+      (function(){
+        var root=document.getElementById('root');
+        var pickerAutoOpened=false;
+        function hasMovieId(){
+          var searchMovie=new URLSearchParams(window.location.search).get('movie');
+          var hashMovie=new URLSearchParams(window.location.hash.slice(1)).get('movie');
+          return Boolean((searchMovie&&searchMovie.trim())||(hashMovie&&hashMovie.trim()));
+        }
+        function syncMovieSelection(){
+          if(hasMovieId()){
+            document.body.classList.remove('oc-selecting-movie');
+            return;
+          }
+          document.body.classList.add('oc-selecting-movie');
+          if(pickerAutoOpened||root.querySelector('dialog[open]'))return;
+          var openButton=root.querySelector('.oc-page-heading > button');
+          if(openButton){
+            pickerAutoOpened=true;
+            openButton.click();
+          }
+        }
+        function handleHistoryChange(){
+          if(!hasMovieId())pickerAutoOpened=false;
+          syncMovieSelection();
+        }
+        var observer=new MutationObserver(syncMovieSelection);
+        observer.observe(root,{childList:true,subtree:true});
+        window.addEventListener('popstate',handleHistoryChange);
+        window.addEventListener('hashchange',handleHistoryChange);
+        syncMovieSelection();
+      })();
     </script>
       <script type="module" src="/js/community.js"></script>
   </body>
